@@ -258,7 +258,10 @@ begin
   perform app.require_valid(
     (select count(*) from pg_proc p where p.oid = v_oid
       and p.proname = 'restaurant_day_overview'
-      and p.proargtypes = 'uuid'::regtype::oidvector
+      -- `pronargs = 1` right below guarantees the vector holds exactly one OID, so its text form
+      -- IS that OID. (`proargtypes::oid[]` keeps oidvector's [0:0] subscripts, and comparing it to a
+      -- freshly built array is false — a catalogue quirk, not a signature problem.)
+      and p.proargtypes::text = (select oid::text from pg_type where typname = 'uuid')
       and p.pronargs = 1
       and p.prorettype = 'jsonb'::regtype) = 1,
     'NIVAAS_MIGRATION_GAP');

@@ -5,8 +5,8 @@
  * Five doors and two read paths, and the reads are the interesting half. `authenticated`
  * holds SELECT on every table in 003 and INSERT/UPDATE/DELETE on none, so a roster is
  * a plain SELECT and a change is always a door call. Nothing in this file can write a
- * row directly — the transport stub in `test-helpers/transport.ts` throws if a service
- * tries, because that is the architecture's central claim rather than a style rule.
+ * row directly — `authenticated` holds no INSERT/UPDATE/DELETE anywhere, which is the
+ * architecture's central claim rather than a style rule.
  *
  * Two asymmetries a screen must know about:
  *

@@ -877,7 +877,7 @@ begin
   perform app.require_valid(
     (select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid
       where c.relname = 'kitchen_order_tickets_idempotency_idx'
-        and i.indisunique and i.indispartial) = 1,
+        and i.indisunique and i.indpred is not null) = 1,
     'NIVAAS_MIGRATION_GAP');
 
   -- Chain guard and touch trigger are attached (counted, not listed).
