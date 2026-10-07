@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens for this product (identity strings live in src/config/brand.ts).
+ *
+ * Identity intent: a calm, premium *operational* tool. Deep slate-teal carries
+ * authority without the warmth of the sibling app's forest-green/gold
+ * palette; brass is a whisper of accent, never a second brand colour. Every
+ * pairing below is chosen to clear WCAG AA for body text:
+ *   ink #15181C on paper #F6F5F2  -> ~15:1
+ *   muted #5F6771 on paper         -> ~5.1:1 (secondary text only)
+ *   brand-700 #1A3D41 on white     -> ~11:1 (links, headings, active nav)
+ *   white on brand-600             -> ~8:1  (primary button fill)
+ * No gradients, no glassmorphism, no shadow stacking.
+ */
+
+@theme {
+  /* Type — Inter throughout; tabular numerals for any figure that can be added up. */
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Brand ramp: deep slate-teal. 500 interactive, 600 fill, 700 emphasis, 900 ink-nav. */
+  --color-brand-50: #eef3f3;
+  --color-brand-100: #d9e5e5;
+  --color-brand-500: #2f6468;
+  --color-brand-600: #234f53;
+  --color-brand-700: #1a3d41;
+  --color-brand-900: #0f2528;
+
+  /* Accent: muted brass. Sparse use only — current section, key metric, focus cue. */
+  --color-brass-100: #f4ecdc;
+  --color-brass-500: #a8874c;
+  --color-brass-600: #85683a;
+
+  /* Surfaces. Warm paper behind white cards gives depth without borders or shadow. */
+  --color-paper: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #faf9f7;
+
+  /* Text. Ink is the only body colour; muted is reserved for labels and metadata. */
+  --color-ink: #15181c;
+  --color-muted: #5f6771;
+
+  /* Lines: one hairline weight everywhere. No 2px rules, no double borders. */
+  --color-line: #e2e6e9;
+  --color-line-strong: #cfd5da;
+
+  /* Semantic — desaturated so alerts read as information, not as decoration. */
+  --color-danger: #a8271f;
+  --color-danger-soft: #fbeceb;
+  --color-warning: #8a5a00;
+  --color-warning-soft: #fbf3e2;
+  --color-success: #1f6b3f;
+  --color-success-soft: #e9f4ed;
+
+  /* Radii — four only: chip, control, card, panel. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  /* Shadows — two soft levels. Anything deeper is a layering mistake. */
+  --shadow-soft: 0 1px 2px rgba(21, 24, 28, 0.05);
+  --shadow-raised: 0 4px 16px rgba(21, 24, 28, 0.07);
+
+  /* Focus ring: brand-tinted, visible on both paper and white. */
+  --color-focus: #2f6468;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Financial figures: tabular numerals plus a slight negative tracking so column
+ * totals line up. Apply to any amount, count or ledger value.
+ */
+@utility money-figure {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
