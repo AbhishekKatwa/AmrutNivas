@@ -111,11 +111,26 @@ configuration**, not on code — see the next list.
 Prerequisites: Phase 0 complete (tenancy, RBAC, audit) and **the printing decision resolved** — KOT/KDS is
 where an unresolved print architecture becomes a customer-visible failure.
 
-**In progress (Prompt #04).** `013` seeded the 27 restaurant tokens onto the system roles and proved the
+**Code complete, unverified (Prompt #04).** `013` seeded the 27 restaurant tokens onto the system roles and proved the
 permission ladder in-SQL; `014` created the six menu tables and their 19 doors, and scenario 15 attacks them.
-Floors/tables, the order state machine, the bill calculation engine, payments and KOT are the remaining #04
-migrations (`015`–`018`), and none of the restaurant UI exists yet — so this phase is substrate, not a usable
-restaurant.
+`015` adds dining areas, tables, their ordering and the derived `restaurant_table_status` view (9 doors);
+`016` adds orders, order items, the order ladder, `app.calculate_restaurant_totals` — the product's only money
+engine — the document-number counter and the outlet business-date resolver (8 doors); `017` adds `bills` and
+`payments` with the five tender doors, frozen-at-open snapshots and payment immutability; `018` adds
+`kitchen_order_tickets` with the fire and ticket ladders and reprint auditing (6 doors); `019` adds
+`restaurant_day_overview`, so a trading day is one door read rather than a client-side aggregation.
+Six screens now sit on those doors: `/menu`, `/tables`, `/pos`, `/billing`, `/kitchen`, `/restaurant`.
+
+**But `015`–`019` have not been applied to any database in this sequence**, no verifier scenario touches the
+restaurant tables yet, and no screen has been loaded in a browser. The phase's own acceptance doc,
+`docs/ACCEPTANCE-04.md`, records every clause as `BUILT, NOT_VERIFIED` — which is the accurate status, not a
+formality. This phase is therefore *complete in design and unproven in fact*; the end pass (harness rebuild,
+new scenarios, `tsc`/`build`, and driving each screen) is the next action, not more code.
+
+Still genuinely out of scope for #04, by decision rather than omission: the tax engine (`014` leaves the tax
+category an unresolved placeholder and `017` freezes `tax_rate` at zero), bill splits, shifts, day close and the
+Z-report, the KDS print path, refunds, and any seeded demo restaurant — inventing bills or payments would put
+fake money into a product whose rule is that a figure appears only because a door computed it.
 
 Must-not-skip detail: tax computation on the bill belongs here (a restaurant that cannot issue a
 compliant bill is not sellable in India), even though the accounting engine and GST reports arrive in

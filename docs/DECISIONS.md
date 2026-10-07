@@ -499,6 +499,100 @@ stay unambiguous.
 role name is only ever resolved within its own `organization_id`. Verifier scenario 13 exercises custom-role
 creation and its ceiling/subset guards.
 
+## D-41 · The restaurant day is a door read, never a client aggregation
+**Date:** 2026-10-07 · **Status:** ACCEPTED (code complete; `019` not yet applied to a database)
+
+**Decision:** Prompt #04 ships `019_restaurant_day_overview.sql` — one `SECURITY DEFINER` function,
+`public.restaurant_day_overview(p_outlet uuid)`, gated on `restaurant.view`, that returns the outlet's trading
+day as a single jsonb document: covers by derived status, ticket counts live and by status for the business
+date, the pass (open slips, lines cooking, lines rung up, reprints and cancellations today), money per currency
+(billed, collected, outstanding, document and payment counts) and tender per method. The dashboard screen calls
+it once and prints what comes back.
+**Reason:** contract §2 allows exactly one place in the product where money is decided — `016`'s
+`app.calculate_restaurant_totals`, snapshotted by `017`'s `open_bill`. A dashboard that SELECTed bills and
+reduced them in TypeScript would be a second engine, and Phase 1's exit gate is the printed bill, the Z-report
+and the outlet revenue figure *agreeing*. Two engines cannot be the proof of each other. A door read also keeps
+the business-date rule in one place: `app.rest_outlet_business_date` is what `create_order`, `open_bill` and
+`record_payment` stamped every row with, so a 00:40 service belongs to one night's figures and only the database
+can say which night.
+**Consequence:** the screen adds nothing and can therefore never disagree with the till; mixed currencies, an
+absent status and a day with no documents each degrade into their own honest answer rather than a zero. The cost
+is one more migration and a jsonb shape the client must map by hand (`src/domain/restaurant/day-service.ts`),
+and the read is unverified until `019` is applied.
+
+## D-42 · Money crosses every seam as text, and a day is reported per currency, never blended
+**Date:** 2026-10-07 · **Status:** ACCEPTED
+
+**Decision:** every amount on every restaurant type is a `string` — `bills.subtotal` … `amount_due`,
+`payments.amount`, `order_items.unit_price`, `kitchen_order_tickets` line prices — and `src/db/money-read.ts`
+`moneyRow` retypes each named cell at the boundary, because PostgREST serialises `numeric` as a JSON number.
+`019` casts its sums `::text` inside the door so the rule holds even for aggregates. The day overview returns one
+money block **per currency** and tender rows per `(currency, method)`; nothing adds two currencies together
+anywhere in the product.
+**Reason:** a float is how ₹0.01 becomes `1e-18`, and a settled bill that reads as unpaid is a guest dispute, not
+a rendering bug. `bills.currency` is derived by `017` from the order's own ACTIVE lines (one outlet publishes one
+menu in one currency, `014`), so no caller is ever asked to supply it — and if a second currency ever appears in
+an outlet, summing across it would produce a figure that means nothing rather than a figure that is wrong.
+**Consequence:** comparisons that matter (`billIsSettled`, `billIsCancellable`, `paymentWithinBalance`) go
+through `moneyFromRupees(...).minor` and are `bigint`; the screens print text with `formatMoneyText`. Every new
+money-bearing door parameter and return cell has to be named in its service's money list — a discipline, not a
+framework, and the place a future migration can go wrong.
+
+## D-43 · A KOT is a print unit: reprint re-emits the same row, counted, reasoned and audited
+**Date:** 2026-10-07 · **Status:** ACCEPTED (code complete; `018` not yet applied)
+
+**Decision:** `kitchen_order_tickets` carries no money of its own; its lines reach it through
+`order_items.kot_id`. A reprint does not mint a ticket — `reprint_kot` re-emits the same row, increments
+`reprint_count`, requires `kot.reprint` *and* a reason, and writes an audit event. The fire ladder has exactly
+two edges (`NOT_FIRED → FIRED → READY`), the ticket ladder exactly two (`OPEN → CLOSED`, `OPEN → CANCELLED`), and
+the only door that writes a fire state accepts `READY` alone.
+**Reason:** Prompt #04 §69's point is that a second slip can double a plate, so a reprint must leave a footprint
+rather than being a no-op — and a cook must not be able to un-ring a plate, because the kitchen's record is what
+tells the next shift what was actually made. Keeping money off the slip is the same separation that keeps a
+`KOT` from being a bill: the pass works quantities and instructions; the till works amounts.
+**Consequence:** a ticket's life ends when its work does — `018` auto-CLOSES a slip when its last FIRED line
+rings up, so no screen calls a close verb. `cancel_kot` returns FIRED lines to NOT_FIRED and detaches them, but
+leaves a READY line its state and its ticket: the plate was made, and the record cannot be restated. Two
+statuses stay independent by rule: `order_items.status` is the sales fact (ACTIVE/VOIDED), `fire_status` is the
+kitchen fact, and neither is a synonym for the other.
+
+## D-44 · A bill is frozen at open, payments are append-only, and status is the door's to derive
+**Date:** 2026-10-07 · **Status:** ACCEPTED (code complete; `017` not yet applied)
+
+**Decision:** `open_bill` snapshots the engine's totals into `bills` and nothing after it may restate that
+document — a reprice, an added line on another bill of the same order, or a voided line cannot change an existing
+bill. Payments are INSERT-only: a SUCCESSFUL row is protected by a guard trigger, there is no update or delete
+verb in `bill-service.ts`, and a wrong payment is answered by a new REFUNDED row carrying its own reason, which
+is a `payment.refund` verb and deliberately unbuilt in this release. `bills.status` is derived by
+`record_payment` from the money it has seen (`OPEN → PARTIALLY_PAID → PAID`); `close_bill` only confirms a
+document that is already settled, and `cancel_bill` refuses the moment any money has been booked.
+**Reason:** contract §8 and §9. A printed document a guest is holding cannot change underneath them, and a
+status that a person can press is a status that will be pressed wrong. Refusing the second live bill
+(`NIVAAS_BILL_ALREADY_OPEN`) and refusing to cancel money that exists (`NIVAAS_BILL_HAS_PAYMENTS`) are the same
+fact stated at the door rather than assumed by the screen.
+**Consequence:** the screens reload the document after a write instead of reconciling it against the ticket, and
+"already billed" is offered as a link rather than a disabled button. The open observation against this decision
+is recorded in `docs/ACCEPTANCE-04.md` §6.3: the status derivation currently lives in a `CASE` inside
+`record_payment`, so a second writer of payment rows would have to repeat the rule.
+
+## D-45 · Prompt #04 ships no tax figure and no seeded restaurant data
+**Date:** 2026-10-07 · **Status:** ACCEPTED
+
+**Decision:** two absences are stated rather than filled. Nothing in this stage invents a tax number: `014` keeps
+`tax_category_id` an opaque placeholder with no foreign key, `017` freezes `order_items.tax_rate` at zero, and
+`RestaurantDayPage` says in prose that no tax engine exists and the day close that signs a Z-report is a later
+release. Equally, the stage's "dev seed" deliverable was declined: no synthetic bills, payments or KOTs are
+written into `db/supabase/` or the client.
+**Reason:** a bill is a statutory document, and a plausible-looking tax rate with nothing behind it is the one
+figure in this product that cannot be an approximation — the tax profile, place-of-supply rules and GST reporting
+are Phase 4's and the owner's design property has real data still to supply (O-5). Fabricating money to make a
+dashboard look alive contradicts the rule the dashboard exists to enforce: a figure appears because a door
+computed it.
+**Consequence:** a first run of `/restaurant` shows the quiet-day card, and every money cell on it is provably
+derived from a document someone actually opened. The cost is that the day read cannot be exercised end-to-end on
+seed data, so its verification depends on driving the real loop (seat → order → fire → settle) on the pilot
+outlet once `015`–`019` are applied.
+
 ---
 
 ## Open decisions (blocking)

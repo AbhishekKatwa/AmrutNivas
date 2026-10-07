@@ -100,6 +100,12 @@ not a bug.
 `restaurant.view` is the entry door: it opens the module for the outlets a person can reach, and each
 area below then answers for itself.
 
+All 27 tokens are now named by a real door: `014` menu, `015` floors and tables, `016` orders, `017` bills and
+payments, `018` KOT, `019` the day read. Two caveats the tables below do not change: those five migrations have
+not been applied to a database yet, so the enforcement is written rather than proven; and `bill.discount` and
+`order.discount` still have **no door behind them** — a role can hold the capability and nothing in the product
+can yet act on it (`docs/ACCEPTANCE-04.md` §6.6).
+
 | Key | Allows | Also held by |
 |---|---|---|
 | `restaurant.view` | Open the restaurant module for the outlets you can reach | KM, ST, EM, FM |

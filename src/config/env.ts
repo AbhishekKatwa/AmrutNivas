@@ -25,8 +25,14 @@ export type BackendStatus =
 const HOSTED_URL = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.supabase\.(co|in|red)\/?$/i;
 /** `supabase start` serves PostgREST on http://localhost:54321. */
 const LOCAL_URL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{2,5})?\/?$/i;
-/** Anon keys are JWTs; the payload is public, so this shape check is honest. */
-const KEY_PATTERN = /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+/** Supabase issues the publishable key in two shapes, and both are valid `apikey` values. */
+const LEGACY_ANON_JWT = /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+/** A `sb_secret_*` or `sbp_*` key matches neither shape, so this gate refuses them by form. */
+const PUBLISHABLE_KEY = /^sb_publishable_[A-Za-z0-9_-]{16,}$/;
+
+function isPublishableKey(value: string): boolean {
+  return LEGACY_ANON_JWT.test(value) || PUBLISHABLE_KEY.test(value);
+}
 
 function readEnv(name: string): string {
   const value = (import.meta.env as Record<string, unknown>)[name];
@@ -62,10 +68,11 @@ export function backendStatus(): BackendStatus {
         "VITE_SUPABASE_URL must be an https://<project>.supabase.co project URL, or a local http://localhost:<port> stack.",
     };
   }
-  if (!KEY_PATTERN.test(anonKey)) {
+  if (!isPublishableKey(anonKey)) {
     return {
       configured: false,
-      reason: "VITE_SUPABASE_ANON_KEY does not look like a Supabase publishable key.",
+      reason:
+        "VITE_SUPABASE_ANON_KEY is neither a legacy anon JWT (eyJ…) nor a sb_publishable_… key, so this build refuses to send it. A sb_secret_… or sbp_… key belongs on the server, never here.",
     };
   }
   return { configured: true, config: { url: url.replace(/\/$/, ""), anonKey } };

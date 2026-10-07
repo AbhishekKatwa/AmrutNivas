@@ -98,3 +98,28 @@ A restaurant is an `outlets` row of type `RESTAURANT` (or `CAFE`, `BAR`, …) fr
 There is no `RestaurantBusiness` entity (#04 §4). Everything restaurant-scoped hangs off
 `outlet_id` with its `organization_id` / `property_id` ancestors denormalized, as everywhere
 else in this schema.
+
+## 13. A trading day is read from the database, never assembled by a screen
+
+*(added with `019_restaurant_day_overview.sql`; D-41)*
+
+The outlet's day — covers, tickets by status, the pass, money billed/collected/outstanding, tender by
+method — is one `SECURITY DEFINER` read, `public.restaurant_day_overview(p_outlet)`, gated on
+`restaurant.view`, returning jsonb with every amount cast `::text`. It takes only an outlet: the tenant
+ancestors and the `business_date` are resolved inside it, off `app.rest_outlet_business_date`, which is the
+same resolver `create_order`, `open_bill` and `record_payment` stamped their rows with.
+
+This is §2 applied to a read. A dashboard that SELECTed `bills` and reduced them in TypeScript would be a
+second place money is decided, and Phase 1's exit gate is the printed bill, the Z-report and the outlet
+revenue figure *agreeing* — two engines cannot certify each other. Two corollaries follow: money is reported
+**one block per currency**, never summed across them, and a status with no rows is absent rather than zero, so
+an empty cell stays an honest absence instead of becoming a claim.
+
+## 14. An absence is stated, not approximated
+
+Nothing in this domain may print a figure it has no authority for. There is no tax engine yet (`014` leaves the
+tax category a placeholder, `017` freezes `tax_rate` at zero), so no screen shows a tax number and the day
+screen says so in prose. There is no day close, shift, Z-report or cash drawer in this release, so the day
+overview is labelled a live read rather than a settlement. And no synthetic bills, payments or KOTs are seeded
+to make a screen look alive (D-45): a quiet outlet's first run shows a quiet card, because every figure here is
+supposed to be traceable to a document someone actually opened.

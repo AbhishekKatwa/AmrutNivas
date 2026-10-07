@@ -17,6 +17,12 @@ import OrganizationPage from "@/pages/organization/OrganizationPage";
 import PropertiesPage from "@/pages/properties/PropertiesPage";
 import OutletsPage from "@/pages/outlets/OutletsPage";
 import DepartmentsPage from "@/pages/departments/DepartmentsPage";
+import MenuPage from "@/pages/restaurant/MenuPage";
+import FloorPage from "@/pages/restaurant/FloorPage";
+import PosPage from "@/pages/restaurant/PosPage";
+import BillPage from "@/pages/restaurant/BillPage";
+import KitchenPage from "@/pages/restaurant/KitchenPage";
+import RestaurantDayPage from "@/pages/restaurant/RestaurantDayPage";
 import TeamPage from "@/pages/team/TeamPage";
 import RolesPage from "@/pages/access/RolesPage";
 import AuditPage from "@/pages/audit/AuditPage";
@@ -44,6 +50,12 @@ export const ROUTES: readonly AppRoute[] = [
   { path: "/properties", component: PropertiesPage, permission: "property.view" },
   { path: "/outlets", component: OutletsPage },
   { path: "/departments", component: DepartmentsPage },
+  { path: "/menu", component: MenuPage, permission: "menu.view" },
+  { path: "/tables", component: FloorPage, permission: "table.view" },
+  { path: "/pos", component: PosPage, permission: "order.view" },
+  { path: "/billing", component: BillPage, permission: "bill.view" },
+  { path: "/kitchen", component: KitchenPage, permission: "kot.view" },
+  { path: "/restaurant", component: RestaurantDayPage, permission: "restaurant.view" },
   { path: "/team", component: TeamPage, permission: "user.view" },
   { path: "/roles", component: RolesPage, permission: "role.view" },
   { path: "/audit", component: AuditPage, permission: "audit.view" },

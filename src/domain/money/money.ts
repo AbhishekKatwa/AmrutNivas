@@ -288,6 +288,33 @@ export function calculateChange(amountReceived: Money, billTotal: Money): Change
   };
 }
 
+/**
+ * A money value that arrived as TEXT from a door or a row, formatted for display.
+ *
+ * Formatting is the only thing that happens to the amount: the digits go into exact minor
+ * units and never through a float (contract §1), so a screen can print the database's answer
+ * without computing anything of its own.
+ */
+export function formatMoneyText(amount: string, currency: CurrencyCode = FALLBACK_CURRENCY): string {
+  return formatMoney(moneyFromRupees(amount, currency), { currency });
+}
+
+/**
+ * A modifier's delta, read as what it does to the bill rather than as a bare number: a
+ * positive adjustment carries an explicit plus, a negative one formats with its own minus,
+ * and zero is the sentence "no extra cost" instead of a currency amount.
+ */
+export function formatAdjustmentText(
+  adjustment: string,
+  currency: CurrencyCode = FALLBACK_CURRENCY,
+): string {
+  const money = moneyFromRupees(adjustment, currency);
+  if (money.minor === 0n) return "No extra cost";
+  return money.minor > 0n
+    ? `+ ${formatMoney(money, { currency })}`
+    : formatMoney(money, { currency });
+}
+
 /** Why a typed amount was refused — one line each, so a field can show it verbatim. */
 export type MoneyInputReject = "BLANK" | "NOT_A_NUMBER" | "TOO_PRECISE" | "NEGATIVE";
 

@@ -123,9 +123,10 @@ role including the owner. Every door writes through `app.audit()`.
 
 ### 2.2 Target entities (modules NOT built yet)
 
-The table below is the contract later phases must conform to. Except for the four menu rows marked
-**IMPLEMENTED (`014`)**, none of these rows, tables or doors exist today; the relationships in §3 and the state
-machines in §4 are canonical *intent*, not implementation.
+The table below is the contract later phases must conform to. Except for the rows marked **IMPLEMENTED** — the
+four menu rows from `014` and the restaurant rows from `015`–`019` — none of these tables or doors exist, and
+the restaurant ones that exist have **not been applied to a database yet** (see `docs/ACCEPTANCE-04.md`); the
+relationships in §3 and the state machines in §4 are canonical *intent* until a harness run says otherwise.
 
 | Domain | Entity | Scope | Meaning and key relationships |
 |---|---|---|---|
@@ -144,10 +145,12 @@ machines in §4 are canonical *intent*, not implementation.
 | hotel | `HousekeepingTask` | property → department | assigned clean/inspection work with completion evidence |
 | restaurant | `Menu` / `MenuItem` | outlet | **IMPLEMENTED (`014`: `menus`, `menu_items`, `menu_item_prices`)** — versioned price list, one effective-dated price row per item, `menu_snapshot`/`menu_item_current_price` as priced reads. `tax_category_id` is an opaque placeholder with deliberately no foreign key until the tax module lands, so an item still carries no rate constant |
 | restaurant | `ModifierGroup` / `Modifier` | outlet | **IMPLEMENTED (`014`)** — options, supplements and per-item price deltas, with min/max selection rules enforced in-SQL |
-| restaurant | `Table` | outlet | seating map, capacity, status; a `Section` groups tables for a waiter |
-| restaurant | `Order` | outlet (+ table) | a billable open/fired document; lines → `OrderItem`; posts to `Folio` or settles directly |
-| restaurant | `KOT` (kitchen ticket) | outlet → department Kitchen | the fire instruction derived from an order; lifecycle separate from the bill |
-| restaurant | `Payment` | property | money actually received; a settlement of one or more documents. Distinct from billing |
+| restaurant | `Table` | outlet | **IMPLEMENTED (`015`: `dining_areas`, `restaurant_tables`, view `restaurant_table_status`)** — seating map, capacity, ordering, and a service status a person can set (`AVAILABLE/OCCUPIED/RESERVED/CLEANING/OUT_OF_SERVICE`); the *derived* status is what the floor and the day read, precedence-resolved by `016`'s orders, and a `Section` groups tables for a waiter |
+| restaurant | `Order` | outlet (+ table) | **IMPLEMENTED (`016`: `orders`, `order_items`)** — a billable ticket on a business date; lines → `OrderItem` with `status` (sales: ACTIVE/VOIDED) *and* `fire_status` (kitchen: NOT_FIRED/FIRED/READY) as independent columns; totals are written only by `app.calculate_restaurant_totals`. Posting to a `Folio` is still #08's |
+| restaurant | `Bill` (restaurant document) | outlet (+ order) | **IMPLEMENTED (`017`: `bills`)** — the frozen snapshot of the engine's answer at `open_bill`, with its own `currency` derived from the order's ACTIVE lines, `bill_number` from the counter, and status derived by money (`OPEN → PARTIALLY_PAID → PAID`, plus `CANCELLED`). This is the guest's document, **not** the finance `Invoice`/`Bill` below |
+| restaurant | `Payment` | property | **IMPLEMENTED (`017`: `payments`)** — money actually received against one bill; append-only, SUCCESSFUL rows immutable under a guard trigger, a wrong payment answered by a new REFUNDED row with a reason |
+| restaurant | `KOT` (kitchen ticket) | outlet → department Kitchen | **IMPLEMENTED (`018`: `kitchen_order_tickets`)** — the fire instruction derived from an order, carrying quantities and instructions and **no money**; lines point at it via `order_items.kot_id`, a reprint re-emits the same row with `reprint_count` incremented, and the lifecycle is separate from the bill's (`OPEN → CLOSED \| CANCELLED`) |
+| restaurant | `DayOverview` | outlet | **READ MODEL ONLY (`019`: `restaurant_day_overview`)** — covers, tickets, the pass and money per currency for one business date, computed in-SQL. It is not a table and has no entity of its own; nothing aggregates these figures in the client (contract §2, D-41) |
 | inventory | `Item` (stock) | organization (master) → per-property ledger | UoM, conversion, valuation policy, reorder/coverage target |
 | inventory | `Recipe` | outlet | item → component quantities; the bridge that turns an `OrderItem` into stock consumption |
 | inventory | `StockMovement` | property (+ outlet/department) | the ledger: OPENING, PURCHASE, TRANSFER_IN, CONSUMPTION, WASTAGE, TRANSFER_OUT, ADJUSTMENT |
@@ -155,7 +158,7 @@ machines in §4 are canonical *intent*, not implementation.
 | procurement | `Supplier` | organization | one name per party; master data shared across properties |
 | procurement | `PurchaseOrder` | property | request/approve with `purchase.approve`; expectation of receipt |
 | procurement | `GoodsReceivedNote` | property → department Stores | creates stock movements and a payable |
-| finance | `Invoice` / `Bill` | property (+ outlet) | billed amount. Issued document, immutable once finalised |
+| finance | `Invoice` / `Bill` | property (+ outlet) | billed amount. Issued document, immutable once finalised. This is Phase 4's accounting document — the restaurant's guest-facing bill is `017`'s `bills`, above |
 | finance | `Journal` / `JournalLine` | property → cost centre | double-entry posting; debit = credit is a DB invariant |
 | finance | `Account` (CoA) | organization | single chart of accounts, per-tenant |
 | finance | `AccountingPeriod` | organization | OPEN / CLOSED; writes into a closed period are refused |
@@ -197,8 +200,9 @@ are two apps that disagree at audit time.
 
 ## 4. State machines (canonical, to be implemented with the modules)
 
-**Built now** — the executed lifecycles, each enforced by a `CHECK` and diffed against its client array
-(§2.1):
+**Built now** — the lifecycles that exist as schema, each enforced by a `CHECK` and diffed against its client
+array (§2.1). The five identity rows are applied and verified; the six restaurant rows are marked as such and are
+written in `015`–`018`, **not yet applied to a database**:
 
 | Entity | States | Transitions |
 |---|---|---|
@@ -207,16 +211,23 @@ are two apps that disagree at audit time.
 | Membership | `INVITED → ACTIVE ↔ SUSPENDED → REMOVED` (terminal) | via `set_member_status`; suspension also revokes that person's `user_roles` grants (§2.1), and `REMOVED` additionally deletes their property/outlet breadth rows (`009`). An `is_owner` row cannot be suspended/removed without first transferring — `NIVAAS_OWNER_MUST_TRANSFER` (D-29) |
 | Invitation | `INVITED → ACCEPTED \| EXPIRED \| CANCELLED \| REVOKED` | `accept_invitation` (one-time, hash-verified, address-matched), `cancel_invitation` (inviter → CANCELLED, anyone else → REVOKED). `012` enforces one pending invitation per `(organization, email)` via a partial unique index and sweeps expiry lazily (`app.expire_stale_invitations`) |
 | RoleGrant | active ⟷ `revoked_at` stamped | `assign_role` / `revoke_role`; revocation is never a delete |
+| Order *(written in `016`, not yet applied)* | `PLACED → CONFIRMED → PREPARING → READY → SERVED → COMPLETED`, plus `CANCELLED` and `VOIDED` | only `set_order_status` moves a ticket, through `app.assert_order_chain`; `send_kot` drives the order to PREPARING and `open_bill` drives it to SERVED **through that same machine**, so no screen writes a status and no verb skips a rung |
+| OrderItem fire status *(written in `018`)* | `NOT_FIRED → FIRED → READY`, two edges exactly | `set_order_item_fire_status` is the only writer and accepts READY alone — a cook cannot un-ring a plate. Independent of the line's sales `status` (ACTIVE/VOIDED), never a synonym for it |
+| KOT *(written in `018`)* | `OPEN → CLOSED`, `OPEN → CANCELLED` | a slip auto-CLOSES when its last FIRED line rings up, so no screen calls a close verb; `cancel_kot` needs `kot.cancel` and a reason, returns FIRED lines to NOT_FIRED, and leaves a READY line its state |
+| Bill *(written in `017`)* | `OPEN → PARTIALLY_PAID → PAID`, plus `CANCELLED` | derived by `record_payment` from the money it has seen — status is not a button. `close_bill` confirms an already-settled document; `cancel_bill` refuses the moment any money is booked |
+| Payment *(written in `017`)* | `SUCCESSFUL \| FAILED \| REFUNDED`, INSERT-only | a SUCCESSFUL row is immutable under 017's guard trigger; there is no update or delete verb anywhere in the client, and a wrong payment is answered by a new REFUNDED row carrying its own reason |
+| Table service status *(written in `015`)* | person-set `AVAILABLE / OCCUPIED / RESERVED / CLEANING / OUT_OF_SERVICE`; the operational status is **derived** | `set_table_service_status` records the human fact; the `restaurant_table_status` view resolves precedence over `016`'s orders, so the floor and the day read one answer |
 
 All are archive-only: no delete transition exists for any entity, anywhere in the surface.
 
-**Target** — module state machines, none built:
+**Target** — module state machines with nothing behind them yet (the Order row below is the exception: its
+ladder is built, its amendments are not):
 
 | Entity | States | Notes |
 |---|---|---|
 | Reservation | `DRAFT → CONFIRMED → CHECKED_IN → CHECKED_OUT` + `CANCELLED`, `NO_SHOW`, `WAITLIST` | cancel vs no-show have different money consequences |
 | Room | `VACANT_CLEAN → VACANT_DIRTY → OCCUPIED → OUT_OF_ORDER` | housekeeping drives the first two transitions |
-| Order | `OPEN → FIRED → PARTIALLY_SERVED → CLOSED → SETTLED` + `VOIDED` | a `KOT` fires per course; an amendment after fire requires a kitchen-visible delta |
+| Order amendments | the ladder itself is built (above, `016`) | what is still missing is the *middle*: a course model, an amendment after fire that shows the kitchen a visible delta, and a split — all Prompt #05's |
 | StockMovement | immutable | corrections are new ADJUSTMENT rows with a reason, never edits |
 | Invoice / Bill | `DRAFT → ISSUED → PARTIALLY_PAID → PAID` + `CANCELLED`, `CREDIT_NOTE_ISSUED` | issued is immutable; adjustment is a credit note |
 | AccountingPeriod | `OPEN → CLOSED` | closing is a gated, audited action |
@@ -228,9 +239,16 @@ All are archive-only: no delete transition exists for any entity, anywhere in th
 
 **Enforced and verified today:** #1 and #2 (denormalized ancestors + chain triggers raise
 `NIVAAS_SCOPE_MISMATCH`; scenarios 1, 3 and 5 of `db/verify/tenant_isolation.sql` prove cross-tenant reads
-and writes are refused under the `authenticated` role), and the archive/version invariants of §2.1. The rest
-attach to modules that do not exist yet and are **not yet enforced by anything** — listed here so each module
-inherits them at birth.
+and writes are refused under the `authenticated` role), and the archive/version invariants of §2.1.
+**Written into SQL but not yet applied to a database:** #4, #6, #7, #8 and #9 now have real enforcement in
+`016`–`019` — a bill's billed/paid/due are separate aggregates with `amount_due` derived, every money column is
+`numeric` with explicit scale and TEXT across the wire (never a float), each sensitive door calls
+`app.require_reason` and `app.audit()` in the same transaction, business-day membership comes from
+`app.rest_outlet_business_date` against the outlet's own settings, and `BILL-nnn`/`KOT-nnn` are allocated by
+`app.next_document_number` per tenant per class. Those migrations have not run, so the proof is the in-file
+self-check, not a scenario.
+**Not yet enforced by anything:** #3, #5 and #10 attach to modules that do not exist yet — listed here so each
+module inherits them at birth.
 
 1. A row cannot exist without the scope it claims: an `Order` without an `outlet` belonging to a real
    `Property` of the writing tenant is refused.

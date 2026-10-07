@@ -71,8 +71,22 @@ export const NAVIGATION: readonly NavGroup[] = [
     labelKey: "nav.operations",
     items: [
       { labelKey: "nav.operations.hotel", phase: 3, available: false },
-      { labelKey: "nav.operations.restaurant", phase: 1, available: false },
-      { labelKey: "nav.operations.kitchen", phase: 1, available: false },
+      // Prompt #04's first shipped surface: the menu of the active outlet, read and
+      // written through 014's doors.
+      { labelKey: "nav.operations.menu", path: "/menu", phase: 1, available: true },
+      { labelKey: "nav.operations.floor", path: "/tables", phase: 1, available: true },
+      // 016's eight doors: tickets of the active outlet, staged on the device and booked by
+      // the database. Totals are deliberately absent — the bill engine (017) owns those.
+      { labelKey: "nav.operations.point_of_sale", path: "/pos", phase: 1, available: true },
+      // 017's five doors: the document the calculation engine froze, the money booked against it,
+      // and the settlement that hands it over. The counter reads figures and works none out.
+      { labelKey: "nav.operations.billing", path: "/billing", phase: 1, available: true },
+      // 018's queue: slips fired to the pass, rung up line by line, reprinted and retired with a
+      // reason. A slip carries quantities and instructions and no money of its own.
+      { labelKey: "nav.operations.kitchen", path: "/kitchen", phase: 1, available: true },
+      // 019's single door: the trading day as the database reads it — covers, tickets, the pass,
+      // and money per currency. The screen sums nothing, so the day cannot disagree with the till.
+      { labelKey: "nav.operations.restaurant", path: "/restaurant", phase: 1, available: true },
       { labelKey: "nav.operations.housekeeping", phase: 3, available: false },
       { labelKey: "nav.operations.events", phase: 6, available: false },
     ],

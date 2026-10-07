@@ -1050,6 +1050,7 @@ declare
   v_prop     uuid;
   v_order    jsonb;
   v_line     jsonb;
+  v_lines    jsonb;
   v_mod      jsonb;
   v_elem     jsonb;
   v_date     date;
@@ -1099,11 +1100,15 @@ begin
   perform app.require_valid(jsonb_array_length(p_items) > 0, 'NIVAAS_EMPTY_ORDER');
 
   -- Every line resolves BEFORE anything is booked: an order the kitchen cannot
-  -- cook never reaches the sequence, so a mistyped item costs no document number.
-  -- (The loop runs twice in spirit only in the sense that the resolver is pure
-  -- reads; the writes below re-freeze from its own output, not from a second
-  -- menu read that could have moved. Prices moving between resolve and insert is
-  -- exactly what the snapshot makes harmless.)
+  -- cook never reaches the sequence, so a mistyped item costs no document number
+  -- — a refused create leaves the counter where it was (scenario 17 measures the
+  -- value not moving across failed creates). The frozen values written below come
+  -- from THIS resolve pass, not from a second menu read: a reprice landing between
+  -- resolve and insert is exactly what the snapshot makes harmless.
+  v_lines := '[]'::jsonb;
+  for v_elem in select * from jsonb_array_elements(p_items) loop
+    v_lines := v_lines || jsonb_build_array(app.resolve_restaurant_order_line(p_outlet, v_elem));
+  end loop;
 
   v_date := app.rest_outlet_business_date(p_outlet);
   v_number := app.next_document_number(v_org, v_prop, p_outlet, 'ORD', v_date);
@@ -1135,8 +1140,7 @@ begin
     return v_order;  -- replay: unchanged first order, no second booking, no second audit
   end;
 
-  for v_elem in select * from jsonb_array_elements(p_items) loop
-    v_line := app.resolve_restaurant_order_line(p_outlet, v_elem);
+  for v_line in select * from jsonb_array_elements(v_lines) loop
     v_seq := v_seq + 1;
     insert into public.order_items (organization_id, property_id, outlet_id, order_id,
       menu_item_id, item_name_snapshot, item_code_snapshot, currency, unit_price,

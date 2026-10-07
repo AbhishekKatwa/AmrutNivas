@@ -216,6 +216,116 @@ export const DOOR_ERRORS: Record<string, DoorErrorSpec> = {
     "A table position is a spot on the floor map, between 0 and 10000.",
   ),
 
+  // ---- orders (016). The copy names what the person can actually change; the constraint
+  // behind it (a partial unique index, a state machine in app, a snapshot durability rule)
+  // never reaches the screen. These are the refusals 016's eight doors raise.
+  NIVAAS_INVALID_ORDER_TYPE: spec("VALIDATION_FAILED", "Choose DINE_IN or TAKEAWAY."),
+  NIVAAS_EMPTY_ORDER: spec("VALIDATION_FAILED", "An order must have at least one line."),
+  NIVAAS_ORDER_TABLE_MISMATCH: spec(
+    "VALIDATION_FAILED",
+    "A dine-in order needs a table before it can be placed.",
+  ),
+  NIVAAS_TABLE_NOT_IN_OUTLET: spec(
+    "VALIDATION_FAILED",
+    "That table is not part of this outlet, so the order cannot sit there.",
+  ),
+  NIVAAS_TABLE_OUT_OF_SERVICE: spec(
+    "CONFLICT",
+    "This table is out of service, so it cannot take an order.",
+  ),
+  NIVAAS_ITEM_NOT_ON_MENU: spec(
+    "VALIDATION_FAILED",
+    "That item is not on this menu, so it cannot be ordered here.",
+  ),
+  NIVAAS_ITEM_HAS_NO_PRICE: spec(
+    "CONFLICT",
+    "That item has no price taking effect right now, so it cannot be ordered.",
+  ),
+  NIVAAS_INVALID_QUANTITY: spec(
+    "VALIDATION_FAILED",
+    "Enter a quantity between 1 and 999.",
+  ),
+  NIVAAS_INVALID_SELECTION_COUNT: spec(
+    "VALIDATION_FAILED",
+    "The number of chosen options does not fit this group's rules.",
+  ),
+  NIVAAS_INVALID_MODIFIER_CHOICE: spec(
+    "VALIDATION_FAILED",
+    "That option is not available for this item.",
+  ),
+  NIVAAS_INVALID_ORDER_LINE: spec(
+    "VALIDATION_FAILED",
+    "That order line cannot be changed.",
+  ),
+  NIVAAS_IMMUTABLE_ORDER: spec(
+    "CONFLICT",
+    "This order has already been served, so its lines cannot be changed.",
+  ),
+  NIVAAS_INVALID_TRANSITION: spec(
+    "VALIDATION_FAILED",
+    "This order cannot move to that status.",
+  ),
+  NIVAAS_ORDER_NOT_DINE_IN: spec(
+    "VALIDATION_FAILED",
+    "Only a dine-in order can be moved to another table.",
+  ),
+  NIVAAS_CURRENCY_MISMATCH: spec(
+    "VALIDATION_FAILED",
+    "The currency on this line does not match the menu's currency.",
+  ),
+  NIVAAS_INVALID_DOCUMENT_PREFIX: spec(
+    "VALIDATION_FAILED",
+    "Document prefixes use uppercase letters and numbers, up to 8 characters.",
+  ),
+  NIVAAS_INVALID_BUSINESS_DATE: spec(
+    "VALIDATION_FAILED",
+    "A business date is required for document numbering.",
+  ),
+
+  // ---- bills and payments (017). The calculation engine's refusals and the money flow's
+  // invariants. A bill cannot be opened twice, a payment cannot change once successful,
+  // and a cancelled bill refuses new money.
+  NIVAAS_INVALID_ORDER_STATUS: spec(
+    "VALIDATION_FAILED",
+    "This order is not in a state that can be billed.",
+  ),
+  NIVAAS_BILL_ALREADY_OPEN: spec(
+    "CONFLICT",
+    "This order already has an open bill.",
+  ),
+  NIVAAS_BILL_NOT_PAID: spec(
+    "CONFLICT",
+    "This bill still has an outstanding amount.",
+  ),
+  NIVAAS_INVALID_PAYMENT_METHOD: spec(
+    "VALIDATION_FAILED",
+    "Choose CASH, CARD, UPI, BANK_TRANSFER, WALLET or OTHER.",
+  ),
+  NIVAAS_BILL_CANCELLED: spec(
+    "CONFLICT",
+    "This bill has been cancelled and cannot accept payments.",
+  ),
+  NIVAAS_BILL_HAS_PAYMENTS: spec(
+    "CONFLICT",
+    "This bill has payments recorded against it and cannot be cancelled.",
+  ),
+  NIVAAS_PAYMENT_IMMUTABLE: spec(
+    "CONFLICT",
+    "A successful payment cannot be changed. Record a refund instead.",
+  ),
+
+  // ---- the pass (018). A KOT is the kitchen's copy of a send: the slip itself, the line
+  // fire states on it, and the reprint footprint. The copy stays in the waiter's terms —
+  // "this line cannot go on the next slip" — not the database's (`fire_status in (...)`).
+  NIVAAS_KOT_EMPTY: spec(
+    "VALIDATION_FAILED",
+    "Choose at least one line to send to the kitchen.",
+  ),
+  NIVAAS_KOT_LINE_NOT_FIRABLE: spec(
+    "CONFLICT",
+    "That line cannot go on this ticket — it is voided, already cooked, or already sent.",
+  ),
+
   // ---- lookups
   NIVAAS_NOT_FOUND: spec("RESOURCE_NOT_FOUND", "That record could not be found."),
   NIVAAS_ROLE_NOT_FOUND: spec("RESOURCE_NOT_FOUND", "That role is no longer available."),

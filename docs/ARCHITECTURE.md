@@ -2,8 +2,7 @@
 
 **Positioning:** The Operating System for Hospitality — a multi-tenant, multi-property, multi-outlet,
 multi-role, multi-language, multi-currency, AI-ready hospitality SaaS.
-**Status of this document:** Prompt #01 direction, corrected against what Prompt #02, #03 and the first
-half of #04 actually built. The tenancy data plane, the tenant architecture and the authentication/RBAC/audit
+**Status of this document:** Prompt #01 direction, corrected against what Prompt #02, #03 and #04 actually built. The tenancy data plane, the tenant architecture and the authentication/RBAC/audit
 hardening are **IMPLEMENTED and executed** — `db/supabase/000`–`014` applied twice over: against a real
 PostgreSQL 18.3 in `db/harness/` (and attacked by `db/verify/tenant_isolation.sql`: **15 scenarios, 195 `PASS`
 assertions, 0 failures**) and against the hosted AMRUT NIVAAS Supabase project (`000`–`014` minus the dev-only
@@ -11,6 +10,14 @@ assertions, 0 failures**) and against the hosted AMRUT NIVAAS Supabase project (
 lives in `src/db`, `src/domain` and `src/state`, the built shell/screens in `src/app` and `src/pages`, and the
 suite is **51 files / 721 tests**. `013`/`014` are Prompt #04's substrate — the restaurant permission ladder and
 the menu domain — and are described here because they are schema facts, not because the module is finished.
+**The rest of the restaurant is written and unproven.** `015` (floors, areas, tables, the derived status view),
+`016` (orders, order items, the order ladder, `app.calculate_restaurant_totals`), `017` (bills, payments, the
+five tender doors), `018` (KOT) and `019` (`restaurant_day_overview`) exist as migrations with in-file
+self-checks, and **no harness or hosted run after `014` is recorded for any of them** — nor for their client
+(`src/domain/restaurant/{menu,floor,order,bill,kot,day}-service.ts`, six screens in `src/pages/restaurant`).
+That work is described below because it is the design, not because it is verified;
+`docs/ACCEPTANCE-04.md` holds the row-by-row verdicts, all of which read `BUILT, NOT_VERIFIED`. Prompt #04 adds
+no tests, by the owner's standing instruction.
 Anything marked **not yet exercised** has no proof behind it yet and must not be read as done — see the closing
 list.
 
@@ -306,8 +313,9 @@ two funnels only  src/db/rpc.ts            callDoor / callDoorRow  = every write
                                              rows / camelRows / firstCamelRow = a plain SELECT under RLS, read-only by type
 one case map      src/db/case.ts           toCamelCase at the TOP LEVEL only (JSON columns keep their own keys);
                                              toDoorArgs: expectedVersion → p_expected_version, p_ stripped on the way back
-the door          public.<fn> (005,007,010,011) SECURITY DEFINER, set search_path = '', re-proves membership+permission,
-                                             acts, calls app.audit(), returns the written row as jsonb
+the door          public.<fn> (005,007,010,011,014–019) SECURITY DEFINER, set search_path = '', re-proves
+                                             membership+permission, acts, calls app.audit(), returns the written
+                                             row as jsonb
 the backstop      RLS (003)                even if a door were bypassed, authenticated holds SELECT only and every
                                              tenant table has a scope policy — the client is convenience, the DB is truth
 ```
@@ -322,7 +330,8 @@ purpose: a second read can race a concurrent change and then the UI would displa
 
 Supabase's PostgREST serves functions in **`public`** and nothing else. So the split is load-bearing:
 
-- **`public`** holds only the **50 client-facing doors** — the whole write API of the product, named in one
+- **`public`** holds only the **79 client-facing doors** (50 through `014`, plus the 29 restaurant doors below) —
+  the whole write API of the product, named in one
   place in `src/db/doors.ts`: 12 hierarchy (`create/update/set_*_status` × organization/property/outlet/
   department), 9 people/access (`invite_member`, `accept_invitation`, `cancel_invitation`, `set_member_status`,
   `transfer_ownership`, `assign_role`, `revoke_role`, `set_property_access`, `set_outlet_access`), 4 custom-role
@@ -333,6 +342,18 @@ Supabase's PostgREST serves functions in **`public`** and nothing else. So the s
   from the snapshot the kitchen served, not from whatever the price row is today), and 1 dev-only
   (`claim_demo_organization`, from `007`). 24 are defined in `005_write_rpc.sql`; `claim_demo_organization` is
   the 25th (in `007`); `010`/`011` add 6 more and `014` the final 19.
+- **Prompt #04's 29 restaurant doors** continue the same rule — a verb the database can refuse, and no verb
+  that a screen could do instead: `015` 9 (`create/update/archive/reorder_*` for dining areas and tables, plus
+  `set_table_service_status`); `016` 8 (`create_order`, `add_order_items`, `update_order_item`,
+  `void_order_item`, `set_order_status`, `move_order_table`, and the two resolved reads `order_detail`,
+  `open_orders`); `017` 5 (`open_bill`, `record_payment`, `close_bill`, `cancel_bill`, `bill_detail`); `018` 6
+  (`send_kot`, `set_order_item_fire_status`, `cancel_kot`, `reprint_kot`, `kot_detail`, `open_kots`); `019` 1
+  (`restaurant_day_overview`). The day read is a door rather than six SELECTs **because contract §2 forbids a
+  second engine**: an outlet's billed/collected/outstanding figures are Postgres sums in `numeric` over the
+  documents `017` wrote, returned as text, and any client that aggregated them would be the second place money
+  is decided. Two restaurant reads stay plain SELECTs under RLS because the migrations deliberately grant them:
+  `listOpenBills`/`findBillForOrder` on `bills` (017 ships no list door) and the floor's derived
+  `restaurant_table_status` view.
 - **`app`** holds every guard and helper — access resolution, validation, `audit()`, `blankable()`, version
   checks, chain assertions — and is **unreachable from a browser regardless of grants**, because PostgREST
   does not expose it. A bug that leaks an `app.*` name cannot be exploited over HTTP; the surface is closed by
@@ -519,7 +540,9 @@ Prompt #03's security substrate.
   under the RPC funnel and asserts what reached the wire, and `doorParametersMatchTheSchema` checks those
   parameters against the migration signatures — so "the test passes" also means "PostgREST would accept the
   call". The measured total after Prompt #03 and `014` is **51 test files / 721 tests, all passing** (the Prompt
-  #02 snapshot was 41 files / 566 tests).
+  #02 snapshot was 41 files / 566 tests). **Prompt #04 adds no tests and nothing has been re-run**: the owner's
+  standing instruction is no tests, no installs, no builds and no verification during the build-out, so that
+  number is a snapshot of where #03 left off, not a current gate.
 - **SQL verifier** — `db/verify/tenant_isolation.sql` (tenant isolation + Prompt #03 hardening + the #04
   permission ladder and menu domain): **15 scenarios / 195 `PASS` assertions, 0 failures on a cold rebuild**.
   Scenarios 1–9 are the Prompt #02 isolation bar; 10–14 are the Prompt #03 proofs (10 = the account gate `008`,
@@ -530,7 +553,9 @@ Prompt #03's security substrate.
   session), and asserts both directions: the valid case is accepted *and* the invalid case is refused with a
   specific `NIVAAS_*` token.
 - **Typecheck + production build** — `npx tsc --noEmit --incremental false` is clean and `npm run build`
-  succeeds, emitting one JS chunk of **756.42 kB** and **27.44 kB** of CSS. Vite's chunk-size warning fires on
+  succeeds, emitting one JS chunk of **756.42 kB** and **27.44 kB** of CSS. That measurement predates the six
+  restaurant screens; neither command has been run since, so both are **NOT_VERIFIED** for `015`–`019`'s client.
+  Vite's chunk-size warning fires on
   that single bundle; route-level lazy code-splitting was **deliberately not done in this stage** — one honest
   number is easier to revisit when the operational modules land than a premature split.
 
@@ -538,6 +563,10 @@ A green typecheck is not a gate on financial correctness. Future layers (integra
 contract, E2E for money- and stock-critical workflows) arrive with those modules.
 
 **Not yet exercised (no proof behind these yet, do not read as done):**
+- **`015`–`019` and the whole restaurant client.** Five migrations (29 doors, seven tables and one view) and six
+  screens exist as written code: no harness apply past `014` is recorded, no `db/verify` scenario touches
+  `orders`, `bills`, `payments`, `order_items`, `kitchen_order_tickets` or `restaurant_day_overview`, and no
+  restaurant screen has been loaded in a browser. `docs/ACCEPTANCE-04.md` is the per-clause record.
 - **`db/verify` has never run against the hosted project.** The hosted apply *has* happened — `000`–`014` on the
   AMRUT NIVAAS Supabase project, then re-read as 20/20 RLS tables, 50 doors and zero unprotected tables, with an
   anonymous read of `menus` refused (401) and an anonymous `create_menu` refused by the door itself

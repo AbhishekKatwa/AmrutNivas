@@ -84,6 +84,44 @@ export const CLIENT_DOORS = [
   "reorder_restaurant_tables",
   "archive_restaurant_table",
   "set_table_service_status",
+  // orders (016) — Prompt #04 §23-§31's order lifecycle. Eight doors: create_order and
+  // add_order_items build a ticket; update_order_item and void_order_item edit live lines;
+  // set_order_status runs the state machine; move_order_table reassigns a DINE_IN cover;
+  // order_detail and open_orders are reads that go through a door because they resolve
+  // snapshots and derived status in one pass.
+  "create_order",
+  "add_order_items",
+  "update_order_item",
+  "void_order_item",
+  "set_order_status",
+  "move_order_table",
+  "order_detail",
+  "open_orders",
+  // bills and payments (017) — Prompt #04 §32-§50's calculation engine and money flow.
+  // open_bill snapshots totals and mints a BILL number; record_payment books money against
+  // a bill (CASH/CARD/UPI/etc.); close_bill marks it fully paid; cancel_bill voids an
+  // unpaid bill with a reason; bill_detail is a read door that resolves lines + payments.
+  "open_bill",
+  "close_bill",
+  "record_payment",
+  "cancel_bill",
+  "bill_detail",
+  // kitchen order tickets (018) — Prompt #04 §25-§26's pass. send_kot fires lines and
+  // mints the slip (and, per §28, drives the order into PREPARING, which is what kills
+  // CANCEL); set_order_item_fire_status is the cook ringing a line up; cancel_kot retires a
+  // mis-send; reprint_kot is an audited act, not a no-op; kot_detail/open_kots are the
+  // kitchen's two reads.
+  "send_kot",
+  "set_order_item_fire_status",
+  "cancel_kot",
+  "reprint_kot",
+  "kot_detail",
+  "open_kots",
+  // the outlet's trading day (019) — one read that answers "how is tonight going": covers by
+  // derived status, tickets live and by business-date status, the pass's open slips, and the
+  // day's billed / collected / outstanding per currency. The sums are Postgres `numeric`
+  // because contract §2 allows exactly one engine for money, including a day total.
+  "restaurant_day_overview",
   // development seed only (007)
   "claim_demo_organization",
 ] as const;
