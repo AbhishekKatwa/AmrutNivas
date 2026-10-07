@@ -1,11 +1,13 @@
 # AMRUT NIVAAS — Domain Model
 
-The **tenancy, identity, access, session and audit layer is executed** (Prompt #02): it exists as Postgres
-tables (`db/supabase/001`–`004`), as doors (`005`), as the client mirror `src/domain/identity/types.ts`, and
-as scoped services under `src/domain/{hierarchy,access,audit}`. §2 describes that built model, level by
-level. Everything from §3 down — hotel, restaurant, inventory, finance, CRM, events, HR, platform — is still
-the **target shape later modules must conform to**; none of it is built, and nothing here should be read as
-implemented until it is marked otherwise.
+The **tenancy, identity, access, session and audit layer is executed** (Prompt #02, hardened by #03): it exists
+as Postgres tables (`db/supabase/001`–`004`, then `008`–`012`), as doors (`005`, plus `010`/`011`'s), as the
+client mirror `src/domain/identity/types.ts`, and as scoped services under `src/domain/{hierarchy,access,auth,audit}`.
+§2 describes that built model, level by level. Prompt #04 has begun the restaurant from its substrate side:
+`013` seeded the 27 restaurant permissions and `014` created the six menu tables and their 19 doors, so the
+`Menu`/`MenuItem`/`ModifierGroup`/`Modifier` rows below are now **implemented** while the rest — tables, orders,
+KOT, bills, payments, hotel, inventory, finance, CRM, events, HR, platform — is still the **target shape later
+modules must conform to**. Nothing in §3 or §4 should be read as implemented unless this file marks it so.
 
 ---
 
@@ -81,7 +83,7 @@ not accept. The donor app's property-type list drifted exactly this way and a wr
 
 | Entity | Lifecycle | Meaning |
 |---|---|---|
-| `UserAccount` (profiles) | `AccountStatus` = `ACTIVE · INACTIVE · SUSPENDED` | authentication identity, deliberately separate from tenancy; suspending a person from one tenant must not lock them out of another |
+| `UserAccount` (profiles) | `AccountStatus` = `ACTIVE · SUSPENDED · DEACTIVATED` (database-authoritative; `008` retired `INACTIVE`→`DEACTIVATED`) | authentication identity, deliberately separate from tenancy; suspending a person from one tenant must not lock them out of another. `008` added `first_name`/`last_name`/`locale`/`timezone`/`last_login_at` and a generated-stored `display_name`. `profiles.status` is a **platform kill switch with no tenant door** (D-37): tenant-path suspension moves the membership, not the account. |
 | `Membership` (organization_memberships) | `MembershipStatus` = `INVITED · ACTIVE · SUSPENDED · REMOVED` (`REMOVED` terminal) | joins a person to ONE organization; `is_owner` exactly one per org (partial unique index); breadth lives elsewhere, never here |
 | `Invitation` | `InvitationStatus` = `INVITED · ACCEPTED · EXPIRED · CANCELLED · REVOKED` | the token is stored only as a **SHA-256 hash** (`token_hash`, unique) and is **one-time**; `invite_member` returns the plaintext `IssuedInvitation.token` exactly once, and the store must not cache it |
 
@@ -89,8 +91,8 @@ not accept. The donor app's property-type list drifted exactly this way and a wr
 
 | Entity | Meaning |
 |---|---|
-| `Role` | `scope_level` ∈ `GLOBAL · ORGANIZATION · PROPERTY · OUTLET · DEPARTMENT`; `is_system` seeded roles are read-only; `status` `ACTIVE · INACTIVE` |
-| `Permission` | a `domain.verb` string, validated by `PERMISSION_PATTERN` |
+| `Role` | `scope_level` ∈ `GLOBAL · ORGANIZATION · PROPERTY · OUTLET · DEPARTMENT`; `is_system` seeded roles are read-only; `status` `ACTIVE · INACTIVE` (unchanged from `002` — `008` retired `INACTIVE` only on **profiles**, not roles). `009` added `seniority` (1–100 ladder) and `owner_class` (the two roles carrying tenant/platform ownership); `011` makes roles tenant-definable, so `organization_id` scopes a custom role to one tenant |
+| `Permission` | a `domain.verb` string, validated by `PERMISSION_PATTERN`; `006` seeds 25 keys, `011` adds `role.create`/`role.edit` for 27 across 8 domains (catalogue in `docs/PERMISSIONS.md`) |
 | `RoleGrant` (user_roles) | the row that answers "may I?" — `(user, role, org?, property?, outlet?, department?)`; **revocation is a timestamp (`revoked_at`), never a delete** |
 | `PropertyAccess` (membership_property_access) | mode `ALL_PROPERTIES` / `SELECTED_PROPERTIES` |
 | `OutletAccess` (membership_outlet_access) | mode `ALL_OUTLETS` / `SELECTED_OUTLETS` |
@@ -99,7 +101,8 @@ not accept. The donor app's property-type list drifted exactly this way and a wr
   outlet carve-out narrows only outlet-bound rows.
 - **DEPARTMENT-scope grants are refused at the door** (`NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED`) because
   `my_permissions` resolves organization/property/outlet only — the scope level exists as data, the grant path
-  does not exist yet (Prompt #03 decides).
+  does not exist yet. **Prompt #03 kept the refusal** (D-26) rather than half-wire it; resolving department
+  scoping end to end is a named future phase.
 - **Suspension revokes the role grants themselves** (Scenario 6e): setting a membership to `SUSPENDED` (or
   `REMOVED`) stamps `revoked_at` on that person's grants so a later bug cannot honour a dark role row;
   **reinstatement does not restore them** — it needs an explicit `assign_role` re-grant. The person's own
@@ -120,8 +123,9 @@ role including the owner. Every door writes through `app.audit()`.
 
 ### 2.2 Target entities (modules NOT built yet)
 
-The table below is the contract later phases must conform to. None of these rows, tables or doors exist
-today; the relationships in §3 and the state machines in §4 are canonical *intent*, not implementation.
+The table below is the contract later phases must conform to. Except for the four menu rows marked
+**IMPLEMENTED (`014`)**, none of these rows, tables or doors exist today; the relationships in §3 and the state
+machines in §4 are canonical *intent*, not implementation.
 
 | Domain | Entity | Scope | Meaning and key relationships |
 |---|---|---|---|
@@ -138,8 +142,8 @@ today; the relationships in §3 and the state machines in §4 are canonical *int
 | hotel | `Reservation` | property (+ outlet for packages) | arrival/departure, room allocation, rate, status machine, leads to a `Folio` |
 | hotel | `Folio` | property + guest + reservation | the running account a guest settles. **The posting seam every charge channel uses** |
 | hotel | `HousekeepingTask` | property → department | assigned clean/inspection work with completion evidence |
-| restaurant | `Menu` / `MenuItem` | outlet | versioned price list; item carries a tax template reference, never a rate constant |
-| restaurant | `ModifierGroup` / `Modifier` | outlet | options, supplements, per-item price deltas |
+| restaurant | `Menu` / `MenuItem` | outlet | **IMPLEMENTED (`014`: `menus`, `menu_items`, `menu_item_prices`)** — versioned price list, one effective-dated price row per item, `menu_snapshot`/`menu_item_current_price` as priced reads. `tax_category_id` is an opaque placeholder with deliberately no foreign key until the tax module lands, so an item still carries no rate constant |
+| restaurant | `ModifierGroup` / `Modifier` | outlet | **IMPLEMENTED (`014`)** — options, supplements and per-item price deltas, with min/max selection rules enforced in-SQL |
 | restaurant | `Table` | outlet | seating map, capacity, status; a `Section` groups tables for a waiter |
 | restaurant | `Order` | outlet (+ table) | a billable open/fired document; lines → `OrderItem`; posts to `Folio` or settles directly |
 | restaurant | `KOT` (kitchen ticket) | outlet → department Kitchen | the fire instruction derived from an order; lifecycle separate from the bill |
@@ -200,8 +204,8 @@ are two apps that disagree at audit time.
 |---|---|---|
 | Organization | `ACTIVE → SUSPENDED → ARCHIVED` (and back from SUSPENDED) | via `set_organization_status`, `reason` required |
 | Property · Outlet · Department | `ACTIVE ↔ INACTIVE → ARCHIVED` | via `set_property_status` / `set_outlet_status` / `set_department_status` |
-| Membership | `INVITED → ACTIVE ↔ SUSPENDED → REMOVED` (terminal) | via `set_member_status`; suspension also revokes that person's `user_roles` grants (§2.1) |
-| Invitation | `INVITED → ACCEPTED \| EXPIRED \| CANCELLED \| REVOKED` | `accept_invitation` (one-time, hash-verified), `cancel_invitation` |
+| Membership | `INVITED → ACTIVE ↔ SUSPENDED → REMOVED` (terminal) | via `set_member_status`; suspension also revokes that person's `user_roles` grants (§2.1), and `REMOVED` additionally deletes their property/outlet breadth rows (`009`). An `is_owner` row cannot be suspended/removed without first transferring — `NIVAAS_OWNER_MUST_TRANSFER` (D-29) |
+| Invitation | `INVITED → ACCEPTED \| EXPIRED \| CANCELLED \| REVOKED` | `accept_invitation` (one-time, hash-verified, address-matched), `cancel_invitation` (inviter → CANCELLED, anyone else → REVOKED). `012` enforces one pending invitation per `(organization, email)` via a partial unique index and sweeps expiry lazily (`app.expire_stale_invitations`) |
 | RoleGrant | active ⟷ `revoked_at` stamped | `assign_role` / `revoke_role`; revocation is never a delete |
 
 All are archive-only: no delete transition exists for any entity, anywhere in the surface.

@@ -29,7 +29,7 @@ scenarios 1, 2, 3 and 9 of `db/verify/tenant_isolation.sql`.
 
 **`public` doors are the write path.** Supabase's PostgREST serves functions from `public` and
 nothing else, so the schema split is a boundary rather than tidiness (`db/supabase/005_write_rpc.sql`
-header; `docs/ARCHITECTURE.md` §13.1). The 31 client-callable doors are named in `src/db/doors.ts`;
+header; `docs/ARCHITECTURE.md` §13.1). The 50 client-callable doors are named in `src/db/doors.ts`;
 every guard and helper stays in `app` and is unreachable from a browser whatever it is granted. A
 door does the same four things in the same order: resolve the actor from the session (never from an
 argument), re-prove membership + permission + breadth for the ids given and derive denormalized
@@ -238,13 +238,16 @@ documented way out instead of being a wall with no door.
 
 Storage: `role_permissions(role_id, permission)` with `permission` CHECKed by 002 as a lowercase
 `domain.verb` token. The client label layer is `PERMISSION_CATALOGUE` in
-`src/domain/identity/permissions.ts` — 27 entries: the 25 seeded by `006_seed_rbac.sql:77-92` (which
-self-checks `count(*) = 25`) plus `role.create` and `role.edit` inserted by
-`011_custom_roles.sql:62-65`. No other migration writes `role_permissions`, and `permissions.test.ts`
-diffs both SQL files against the TypeScript list in both directions, so a seed gaining or dropping a
-token fails the build rather than shipping a button nobody can press. `audit.export` from Prompt #03
-§58's example list is **not** implemented — only `audit.view` is seeded. Restaurant domains
-(`menu.*`, `order.*`, `table.*`, `kitchen.*`) arrive with Prompt #04, not before.
+`src/domain/identity/permissions.ts` — 54 entries: the 25 seeded by `006_seed_rbac.sql:77-92` (which
+self-checks `count(*) = 25`), `role.create` and `role.edit` inserted by `011_custom_roles.sql:62-65`,
+and the 27 restaurant tokens seeded by `013_restaurant_permissions.sql`. Those three files are the
+sources `permissions.test.ts` re-reads and diffs against the TypeScript list in both directions, so a
+seed gaining or dropping a token fails the build rather than shipping a button nobody can press.
+`audit.export` from Prompt #03 §58's example list is **not** implemented — only `audit.view` is seeded.
+The restaurant verbs (`restaurant.view`, `menu.*`, `table.*`, `order.*`, `kot.*`, `bill.*`,
+`payment.*`) exist in the catalogue as of `013`; the three-segment names Prompt #04 §5 writes
+(`restaurant.menu.view`) are refused by the 002 CHECK, so `013` documents them flattened one level, the
+way `property.manage_access` already does.
 
 The administrator-facing rendering — every key, what it allows, which system role holds it — is
 [PERMISSIONS.md](./PERMISSIONS.md).
@@ -675,9 +678,17 @@ history must call `evaluate_access` before it calls the door; that is a per-modu
 8. **`src/domain/identity/types.ts` lags the database's account vocabulary and profile columns.** §2.
    The database and `authorize.ts` are correct; the picker array is stale, and closing it is a code
    change (`docs/DECISIONS.md` D-34).
-9. **Nothing has run against a hosted AMRUT NIVAAS project, and no emailed sign-in link has been
-   received.** Both are BLOCKED until the owner provisions a new project (`docs/DECISIONS.md` O-7;
-   `docs/ACCEPTANCE.md` §Prompt #03). The session and invitation models are proven at the SQL and
-   door-funnel level only.
+9. **The hosted project is verified structurally, not behaviourally.** `000`–`014` are applied to the real
+   AMRUT NIVAAS Supabase project and re-read as 20/20 RLS tables, 50 doors, no unprotected table, an anonymous
+   table read refused (401) and an anonymous door call refused by the door itself (`NIVAAS_NO_SESSION`) — see
+   `db/harness/remote-apply.mjs check`. What has **not** happened there is a real session: no SMTP transport and
+   no `site_url`, so no emailed magic link has ever been delivered or consumed (`docs/DECISIONS.md` O-8), the
+   195-assertion `db/verify` file is local-only by rule, and `007`'s demo estate is deliberately absent. The
+   session and invitation models are therefore proven at the SQL and door-funnel level, not over a live GoTrue.
 10. **No PostgREST in the local harness**, so the wire contract between this client and these doors is
     exercised by the stub transport in `src/db/rpc.ts`'s tests, not by a live HTTP round trip.
+11. **`db/harness/remote-apply.mjs` uses the Management API with an operator token, and applies what it is
+   told.** It hard-refuses the poultry project's ref and excludes `007` unless `--with-seed` is passed, but an
+   applied migration on a hosted project cannot be un-applied by this tool — there is no downgrade path. Applies
+   are planned (`plan`) before they are run, and the token is read only from the environment or the gitignored
+   root `.env`.

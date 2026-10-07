@@ -16,6 +16,12 @@ npm run build                            # 721.15 kB JS + 27.05 kB CSS
 ./db/harness/local-pg.sh rebuild         # 9 scenarios / 78 PASS assertions, 0 failures (PG 18.3)
 ```
 
+> **Frozen stage report.** These are the Prompt #02 numbers, kept as measured on the day. The tree has moved on:
+> `docs/ACCEPTANCE-03.md` records the current bar (51 files / 721 tests, 15 scenarios / 195 assertions,
+> `000`–`014` applied both locally and on the hosted AMRUT NIVAAS project) and closes §2's first three rows —
+> the hosted project now exists, real sign-in code has landed, and only SMTP delivery remains blocked on the
+> owner.
+
 ---
 
 ## 1. §97 — acceptance checklist

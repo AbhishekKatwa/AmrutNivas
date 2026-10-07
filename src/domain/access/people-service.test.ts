@@ -11,13 +11,19 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   acceptInvitation,
   cancelInvitation,
+  effectiveInvitationStatus,
+  invitationIsUsable,
+  invitationStatusLabel,
   inviteMember,
+  INVITATION_OUTCOME_COPY,
+  listInvitations,
   listMembers,
   listPendingInvitations,
   setMemberStatus,
   transferOwnership,
 } from "./people-service";
 import { setSupabaseClientForTests } from "@/db/client";
+import { INVITATION_STATUSES } from "@/domain/identity/types";
 import {
   doorParametersMatchTheSchema,
   stubBackend,
@@ -32,6 +38,7 @@ const NEW_USER = "b0000000-0000-4000-8000-000000000002";
 const OWNER_MEMBERSHIP = "c0000000-0000-4000-8000-000000000001";
 const NEW_MEMBERSHIP = "c0000000-0000-4000-8000-000000000002";
 const INVITATION = "d0000000-0000-4000-8000-000000000001";
+const OTHER_INVITATION = "d0000000-0000-4000-8000-000000000002";
 const PROPERTY = "a1000000-0000-4000-8000-000000000001";
 const OUTLET = "a2000000-0000-4000-8000-000000000001";
 /** 64 hex characters, the shape `encode(gen_random_bytes(32), 'hex')` produces. */
@@ -54,7 +61,16 @@ function membershipRow(over: Record<string, unknown> = {}): Record<string, unkno
 }
 
 function profileRow(over: Record<string, unknown> = {}): Record<string, unknown> {
-  return { id: OWNER_USER, email: "owner@amrut.example", full_name: "Rhea Amrut", ...over };
+  return {
+    id: OWNER_USER,
+    email: "owner@amrut.example",
+    full_name: "Rhea Amrut",
+    // 008's generated label and 010's activity stamp. `display_name` is never written by a
+    // client, and a NULL `last_login_at` is a real answer ("no sign-in recorded"), not a gap.
+    display_name: "Rhea Amrut",
+    last_login_at: "2026-03-05T08:12:00Z",
+    ...over,
+  };
 }
 
 /** Rows keyed by table, so one stub answers both reads of `listMembers`. */
@@ -120,12 +136,42 @@ describe("listMembers", () => {
       suspendedAt: null,
       removedAt: null,
       version: 3,
-      member: { id: OWNER_USER, email: "owner@amrut.example", fullName: "Rhea Amrut" },
+      member: {
+        id: OWNER_USER,
+        email: "owner@amrut.example",
+        fullName: "Rhea Amrut",
+        displayName: "Rhea Amrut",
+        lastLoginAt: "2026-03-05T08:12:00Z",
+      },
     });
     // A pending membership has no `joined_at` in 002, and the domain reports that NULL
     // rather than the seat's creation date — the person has not joined yet.
     expect(members[1].joinedAt).toBeNull();
     expect(members[1].member?.email).toBe("new@amrut.example");
+  });
+
+  it("brings Last activity and the generated name into the roster (§64)", async () => {
+    // §64 asks the Team screen for "Last activity", and 008 gives it a profile column rather
+    // than a membership one. A NULL has to stay NULL: it means "no sign-in has been recorded",
+    // which is a different fact from "signed in at the seat's creation time".
+    stub = backendWithReads({
+      organization_memberships: [membershipRow()],
+      profiles: [profileRow({ last_login_at: null, display_name: "owner" })],
+    });
+    setSupabaseClientForTests(stub.client);
+
+    const [member] = await listMembers(ORG);
+
+    expect(stub.queries[1].columns).toContain("last_login_at");
+    expect(stub.queries[1].columns).toContain("display_name");
+    expect(stub.queries[1].columns).not.toContain("*");
+    expect(member?.member).toEqual({
+      id: OWNER_USER,
+      email: "owner@amrut.example",
+      fullName: "Rhea Amrut",
+      displayName: "owner",
+      lastLoginAt: null,
+    });
   });
 
   it("returns rows for a real roster rather than only proving the filter", async () => {
@@ -180,7 +226,9 @@ describe("listPendingInvitations", () => {
     const found = await listPendingInvitations(ORG);
 
     expect(stepNames()).toContainEqual(["eq", ["organization_id", ORG]]);
-    expect(stepNames()).toContainEqual(["eq", ["status", "INVITED"]]);
+    // Narrowed through `in` rather than `eq`: `listPendingInvitations` is the one-status case
+    // of `listInvitations`, and the assertion has to follow the filter the read really sends.
+    expect(stepNames()).toContainEqual(["in", ["status", ["INVITED"]]]);
     expect(stepNames()).toContainEqual(["order", ["created_at", { ascending: false }]]);
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({
@@ -204,6 +252,130 @@ describe("listPendingInvitations", () => {
 
     expect(stub.queries[0].columns).not.toContain("token_hash");
     expect(Object.keys(found[0]!)).not.toContain("tokenHash");
+  });
+});
+
+describe("listInvitations — the whole §66 lifecycle", () => {
+  const row = (status: string, id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    organization_id: ORG,
+    email: `${status.toLowerCase()}-${id.slice(-4)}@amrut.example`,
+    phone: null,
+    full_name: null,
+    role_id: "e0000000-0000-4000-8000-000000000001",
+    property_ids: [],
+    outlet_ids: [],
+    status,
+    invited_by: OWNER_USER,
+    expires_at: "2026-03-20T00:00:00Z",
+    accepted_at: null,
+    accepted_by: null,
+    created_at: "2026-03-06T00:00:00Z",
+    updated_at: "2026-03-06T00:00:00Z",
+    ...extra,
+  });
+
+  it("asks the database for every status when none is named", async () => {
+    stub = backendWithReads({ invitations: [] });
+    setSupabaseClientForTests(stub.client);
+
+    await listInvitations(ORG);
+
+    // No status filter at all: an operator reading the lifecycle needs the closed rows too,
+    // and a silent `eq(status, INVITED)` here is how "Accepted" and "Revoked" go missing.
+    expect(stepNames()).toContainEqual(["eq", ["organization_id", ORG]]);
+    expect(
+      stepNames().some(([method, args]) => method === "in" && args[0] === "status"),
+    ).toBe(false);
+    expect(
+      stepNames().some(([method, args]) => method === "eq" && args[0] === "status"),
+    ).toBe(false);
+  });
+
+  it("filters on the statuses it is given, including the terminal ones", async () => {
+    stub = backendWithReads({
+      invitations: [row("CANCELLED", INVITATION), row("REVOKED", OTHER_INVITATION)],
+    });
+    setSupabaseClientForTests(stub.client);
+
+    const found = await listInvitations(ORG, ["CANCELLED", "REVOKED"]);
+
+    expect(stepNames()).toContainEqual(["in", ["status", ["CANCELLED", "REVOKED"]]]);
+    expect(found.map((invitation) => invitation.status)).toEqual(["CANCELLED", "REVOKED"]);
+  });
+
+  it("returns nothing without querying when asked for no statuses", async () => {
+    stub = backendWithReads({ invitations: [row("INVITED", INVITATION)] });
+    setSupabaseClientForTests(stub.client);
+
+    const found = await listInvitations(ORG, []);
+
+    expect(found).toEqual([]);
+    expect(stub.queries).toHaveLength(0);
+  });
+
+  it("keeps token_hash off the wire for the full lifecycle read too", async () => {
+    stub = backendWithReads({ invitations: [] });
+    setSupabaseClientForTests(stub.client);
+
+    await listInvitations(ORG);
+
+    expect(stub.queries[0].columns).not.toContain("token_hash");
+    expect(stub.queries[0].columns).toContain("expires_at");
+  });
+});
+
+describe("the §66 invitation lifecycle, computed rather than asserted", () => {
+  const DAY = "2026-03-20T00:00:00Z";
+  const before = new Date("2026-03-19T00:00:00Z");
+  const after = new Date("2026-03-21T00:00:00Z");
+
+  it("treats a lapsed INVITED row as EXPIRED, which is what the next sweep will do to it", () => {
+    // 012 sweeps expiry; it is not a trigger. Between sweeps the STORED status is a lie about
+    // whether the link works, and a screen that renders the stored value invites an operator
+    // to send someone a link the door will refuse with NIVAAS_INVITATION_EXPIRED.
+    expect(invitationIsUsable({ status: "INVITED", expiresAt: DAY }, before)).toBe(true);
+    expect(invitationIsUsable({ status: "INVITED", expiresAt: DAY }, after)).toBe(false);
+    expect(effectiveInvitationStatus({ status: "INVITED", expiresAt: DAY }, before)).toBe(
+      "INVITED",
+    );
+    expect(effectiveInvitationStatus({ status: "INVITED", expiresAt: DAY }, after)).toBe(
+      "EXPIRED",
+    );
+  });
+
+  it("leaves every closed status exactly as stored — expiry cannot re-open an accepted seat", () => {
+    for (const status of ["ACCEPTED", "EXPIRED", "CANCELLED", "REVOKED"] as const) {
+      expect(effectiveInvitationStatus({ status, expiresAt: DAY }, after)).toBe(status);
+      expect(invitationIsUsable({ status, expiresAt: DAY }, before)).toBe(false);
+    }
+  });
+
+  it("says something different about a cancellation and a revocation, because they are", () => {
+    // §66's requirement in one assertion: these two rows must not render identically.
+    expect(INVITATION_OUTCOME_COPY.CANCELLED).not.toBe(INVITATION_OUTCOME_COPY.REVOKED);
+    expect(INVITATION_OUTCOME_COPY.CANCELLED).toMatch(/person who sent it/i);
+    expect(INVITATION_OUTCOME_COPY.REVOKED).toMatch(/another administrator/i);
+  });
+
+  it("names every status in the vocabulary and no internal token in any sentence", () => {
+    // The copy is operator-facing, so a `NIVAAS_*` string reaching it would leak an internal
+    // code into a screen — the same rule `door-errors` and `authorize.test.ts` enforce.
+    expect(Object.keys(INVITATION_OUTCOME_COPY).sort()).toEqual(
+      [...INVITATION_STATUSES].sort(),
+    );
+    for (const sentence of Object.values(INVITATION_OUTCOME_COPY)) {
+      expect(sentence).not.toMatch(/NIVAAS_/);
+      expect(sentence.length).toBeGreaterThan(10);
+    }
+    expect(invitationStatusLabel("INVITED")).toBe("Pending");
+    expect(invitationStatusLabel("REVOKED")).toBe("Revoked");
+  });
+
+  it("survives a malformed expiry instead of rendering NaN", () => {
+    // A garbage timestamp must not turn an open invitation into a lapsed one by accident.
+    expect(invitationIsUsable({ status: "INVITED", expiresAt: "not a date" }, after)).toBe(true);
+    expect(effectiveInvitationStatus({ status: "INVITED", expiresAt: "" }, after)).toBe("INVITED");
   });
 });
 

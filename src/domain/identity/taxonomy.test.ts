@@ -22,6 +22,14 @@ import {
   PERMISSION_SCOPES,
   SITE_STATUSES,
 } from "./types";
+// The floor's own vocabularies live with the floor, not here; this file only proves they are
+// the lists the database actually enforces.
+import {
+  DINING_AREA_STATUSES,
+  RESTAURANT_TABLE_STATUSES,
+  TABLE_SERVICE_STATUSES,
+  TABLE_SHAPES,
+} from "@/domain/restaurant/types";
 import {
   arrayCheckEnum,
   checkEnum,
@@ -126,6 +134,39 @@ describe("hierarchies and breadth", () => {
   );
   compare("roles.scope_level matches PERMISSION_SCOPES", PERMISSION_SCOPES, () =>
     checkEnum("roles", "scope_level"),
+  );
+});
+
+/**
+ * The restaurant floor (015). Two of these four lists are the same pair of words, and they
+ * are still declared separately on purpose: an area's lifecycle and a cover's lifecycle are
+ * two decisions, and a single shared `ARCHIVABLE_STATUSES` array would let one door's
+ * vocabulary silently become the other's.
+ */
+describe("the floor an outlet eats on (015)", () => {
+  compare("dining_areas.status matches DINING_AREA_STATUSES", DINING_AREA_STATUSES, () =>
+    checkEnum("dining_areas", "status"),
+  );
+  compare(
+    "restaurant_tables.status matches RESTAURANT_TABLE_STATUSES",
+    RESTAURANT_TABLE_STATUSES,
+    () => checkEnum("restaurant_tables", "status"),
+  );
+  // The §20 wall, asserted from the client side: this array is what a status picker renders,
+  // and the CHECK it is compared against is the one 015's self-check reads back out of the
+  // catalog to prove OCCUPIED and RESERVED were never added. If either ever appears here, this
+  // test fails against the database rather than the screen.
+  compare(
+    "restaurant_tables.service_status matches TABLE_SERVICE_STATUSES",
+    TABLE_SERVICE_STATUSES,
+    () => checkEnum("restaurant_tables", "service_status"),
+  );
+  it("keeps the two derived table states out of the writable vocabulary", () => {
+    expect(TABLE_SERVICE_STATUSES).not.toContain("OCCUPIED");
+    expect(TABLE_SERVICE_STATUSES).not.toContain("RESERVED");
+  });
+  compare("restaurant_tables.shape matches TABLE_SHAPES", TABLE_SHAPES, () =>
+    checkEnum("restaurant_tables", "shape"),
   );
 });
 

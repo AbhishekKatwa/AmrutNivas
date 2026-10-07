@@ -153,15 +153,29 @@ error model, the `AuditLogEntry` contract, and the testing foundation (vitest) t
 Deliberately **not** built in this task: POS, PMS, KDS, inventory engine, accounting, GST, HRMS, CRM,
 events, AI, subscription billing, auth implementation, backend/database wiring. See `ROADMAP.md`.
 
+**Where the tree stands after Prompts #02–#04** (this section is a Prompt #01 snapshot; the sentence above is
+no longer the whole truth). Real session handling and the audit trail are built (`008`–`012`,
+`src/domain/auth`, `docs/SECURITY.md`); the permission catalogue is 54 `domain.verb` tokens across 15 domains;
+the tenancy schema is executed both in the local PostgreSQL 18.3 harness and on a hosted AMRUT NIVAAS Supabase
+project (`000`–`014`, dev-only `007` excluded); and `013`/`014` put down Prompt #04's restaurant substrate —
+the permission ladder and the menu domain — with no restaurant UI yet. Still deliberately unbuilt: POS/PMS/KDS
+screens, inventory, accounting, GST, HRMS, CRM, events, AI, subscription billing, and department-scope grants
+(which `assign_role` refuses, D-26).
+
 ---
 
 ## 7. Open decisions that block Prompt #02+
+
+> Live register: `docs/DECISIONS.md` "Open decisions (blocking)" — O-1…O-8, with what each one blocks and
+> whether it is still OPEN or resolved. Two of the five below have since been answered.
 
 1. **Thermal printing path** for kitchen/hotel bills — a browser cannot open a raw TCP socket to an
    ESC/POS device. Either a counter-side local print bridge or browser-print/PDF for V1. Changes the
    architecture; must be answered before POS.
 2. **Hosting/data plane** — Supabase again vs plain Postgres + own API layer, and whether the platform
    control plane (subscriptions, organizations) lives in the same database as tenant data.
+   **Answered → D-16 (Supabase), and the project now exists (O-7 resolved).** Control-plane co-location is
+   still a Phase 9 question.
 3. **Tenant key strategy** — `organization_id` on everything with `property_id`/`outlet_id` only where the
    domain genuinely scopes there (this rule is stated in `ARCHITECTURE.md` §4 but must be applied per table).
 4. **Environment plan** — development / staging / production, and per-customer demo isolation.

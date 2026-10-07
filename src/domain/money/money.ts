@@ -207,3 +207,116 @@ export function assertNoFloatMoney(value: unknown, context: string): Paise {
   if (typeof value === "bigint") return value;
   throw new Error(`${context}: expected minor units as bigint or integer, got ${typeof value}`);
 }
+
+/* ------------------------------------------------- restaurant order arithmetic */
+
+/*
+ * The pieces Prompt #04's order entry needs on top of the amount type above. A POS
+ * line is one unit price times a whole count, a discount is a percentage of a line or
+ * a bill, and the pay screen owes a person the difference between what they handed
+ * over and what the bill came to — so those three live here rather than in each
+ * screen, where they would each invent their own rounding.
+ */
+
+/**
+ * `unitPrice × quantity`. §31 wants a positive whole count, so a zero, a fraction,
+ * `NaN` or `Infinity` is refused here rather than becoming a negative line later.
+ */
+export function multiplyMoneyByQuantity(amount: Money, quantity: number): Money {
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new Error(`Quantity must be a positive whole count of items, got ${quantity}`);
+  }
+  return { minor: amount.minor * BigInt(quantity), currency: amount.currency };
+}
+
+/**
+ * `amount × percent`, rounded half away from zero at the smallest coin.
+ *
+ * `percent` is a decimal STRING ("12.5", "5", "0.25") with at most two fraction
+ * digits, and it becomes whole basis points before any multiplication — so the
+ * percentage never enters a float either. Half-up rather than banker's rounding
+ * because a discount a cashier can predict by hand beats one that is statistically
+ * fairer: on a paisa tie, ₹0.03 at 50% is ₹0.02, and at 50.001%… there is no such
+ * field, so the rule a person can reproduce is the one worth having.
+ */
+export function percentOfMoney(amount: Money, percent: string): Money {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(percent.trim());
+  if (!match) {
+    throw new Error(
+      `Percent must be a decimal with at most 2 fraction digits, got "${percent}"`,
+    );
+  }
+  // The fraction is hundredths of a percent, so "2.5" is 250 basis points and not
+  // 205 — the same pad-to-the-exponent the paisa parser above uses.
+  const basisPoints = BigInt(match[1]) * 100n + BigInt((match[2] ?? "0").padEnd(2, "0"));
+  return {
+    minor: divideRoundHalfAway(amount.minor * basisPoints, 10000n),
+    currency: amount.currency,
+  };
+}
+
+/**
+ * BigInt division truncates toward zero, so a remainder of at least half a
+ * denominator has to be added by hand. Ties go away from zero, for both signs.
+ */
+function divideRoundHalfAway(numerator: Paise, denominator: bigint): Paise {
+  const quotient = numerator / denominator;
+  const remainder = numerator - quotient * denominator;
+  if (remainder === 0n) return quotient;
+  const twiceRemainder = (remainder < 0n ? -remainder : remainder) * 2n;
+  if (twiceRemainder < denominator) return quotient;
+  return numerator < 0n ? quotient - 1n : quotient + 1n;
+}
+
+/**
+ * The pay screen's two possible answers (§65, §66): the change owed back, or the
+ * amount still short. Exactly one is ever non-zero, so the caller cannot render the
+ * wrong half of a negative difference — a "change" of -₹220 is a shortfall, and
+ * saying so is the point of §66's "prevent completion when payment < outstanding".
+ */
+export type ChangeOwed = {
+  readonly change: Money;
+  readonly short: Money;
+};
+
+export function calculateChange(amountReceived: Money, billTotal: Money): ChangeOwed {
+  assertSameCurrency(amountReceived, billTotal);
+  const difference = amountReceived.minor - billTotal.minor;
+  return {
+    change: moneyFromPaise(difference > 0n ? difference : 0n, amountReceived.currency),
+    short: moneyFromPaise(difference < 0n ? -difference : 0n, amountReceived.currency),
+  };
+}
+
+/** Why a typed amount was refused — one line each, so a field can show it verbatim. */
+export type MoneyInputReject = "BLANK" | "NOT_A_NUMBER" | "TOO_PRECISE" | "NEGATIVE";
+
+export type MoneyInput =
+  | { readonly ok: true; readonly amount: Money }
+  | { readonly ok: false; readonly reason: MoneyInputReject };
+
+/**
+ * A typed amount, refused rather than thrown.
+ *
+ * `moneyFromRupees` throws, which is right at a door boundary where a bad string is a
+ * bug; at a text field it is a person mid-typing, so this answers with a reason and no
+ * exception. Deliberately strict about shape: grouped text ("1,234.56") is refused with
+ * `NOT_A_NUMBER` instead of silently stripped, because accepting "1,2,3" on the way in
+ * is how a money field ends up agreeing with itself about nothing.
+ */
+export function parseMoneyInput(
+  value: string,
+  currency: CurrencyCode = FALLBACK_CURRENCY,
+): MoneyInput {
+  const trimmed = value.trim();
+  if (trimmed === "") return { ok: false, reason: "BLANK" };
+  if (trimmed.startsWith("-")) return { ok: false, reason: "NEGATIVE" };
+  if (!/^\d*(?:\.\d*)?$/.test(trimmed) || trimmed === ".") {
+    return { ok: false, reason: "NOT_A_NUMBER" };
+  }
+  const fraction = trimmed.split(".")[1] ?? "";
+  if (fraction.length > specFor(currency).exponent) {
+    return { ok: false, reason: "TOO_PRECISE" };
+  }
+  return { ok: true, amount: moneyFromRupees(trimmed, currency) };
+}

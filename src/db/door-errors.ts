@@ -112,6 +112,110 @@ export const DOOR_ERRORS: Record<string, DoorErrorSpec> = {
     "Roles can be granted at organization, property or outlet level for now.",
   ),
 
+  // ---- menu (014). The copy names what the person can actually change; the
+  // constraint behind it (a partial unique index, a jsonb shape, a display_order
+  // collision inside a two-phase reorder) never reaches the screen.
+  NIVAAS_ARCHIVED: spec("CONFLICT", "That record has been retired, so it can no longer be changed."),
+  NIVAAS_MENU_TAKEN: spec("CONFLICT", "This outlet already has a menu with that name."),
+  NIVAAS_CATEGORY_TAKEN: spec("CONFLICT", "Another category in this menu already uses that name."),
+  NIVAAS_CATEGORY_NOT_IN_MENU: spec(
+    "VALIDATION_FAILED",
+    "That category is not part of this menu.",
+  ),
+  NIVAAS_ITEM_TAKEN: spec("CONFLICT", "Another item in this menu already uses that name."),
+  NIVAAS_ITEM_CODE_TAKEN: spec("CONFLICT", "Another item in this outlet already uses that code."),
+  NIVAAS_ORDER_TAKEN: spec(
+    "CONFLICT",
+    "That position is already taken by another category in this menu.",
+  ),
+  NIVAAS_INVALID_REORDER: spec(
+    "VALIDATION_FAILED",
+    "List every category in this menu exactly once, in the order you want them.",
+  ),
+  NIVAAS_GROUP_TAKEN: spec("CONFLICT", "Another modifier group already uses that name."),
+  NIVAAS_MODIFIER_TAKEN: spec(
+    "CONFLICT",
+    "Another modifier in this group already uses that name.",
+  ),
+  NIVAAS_INVALID_SELECTION_TYPE: spec(
+    "VALIDATION_FAILED",
+    "Choose either single-choice or multi-choice.",
+  ),
+  NIVAAS_INVALID_SELECTION_RANGE: spec(
+    "VALIDATION_FAILED",
+    "The minimum cannot exceed the maximum, and a single-choice group allows exactly one.",
+  ),
+  NIVAAS_INVALID_TYPE: spec(
+    "VALIDATION_FAILED",
+    "Types use lowercase letters, numbers and underscores.",
+  ),
+  NIVAAS_INVALID_ATTRIBUTES: spec(
+    "VALIDATION_FAILED",
+    "Item attributes are written as a set of named values.",
+  ),
+  NIVAAS_INVALID_WINDOW: spec(
+    "VALIDATION_FAILED",
+    "A price period has to end after the date it begins.",
+  ),
+  NIVAAS_INVALID_MONEY: spec(
+    "VALIDATION_FAILED",
+    "Enter an amount with no more than two decimal places.",
+  ),
+  NIVAAS_PRICE_CONFLICT: spec(
+    "CONFLICT",
+    "That item already has a price taking effect on that date.",
+  ),
+
+  // ---- the floor (015). A section of a restaurant and the covers inside it. These read
+  // like floor copy, not like menu copy, because the operator's fix is a different act: move
+  // a table out of a section before retiring the section, name a cover that nothing else on
+  // this floor answers to. `NIVAAS_INVALID_STATUS` and `NIVAAS_ARCHIVED` are already mapped
+  // above — 015's refusals are the same failures, not new ones.
+  NIVAAS_AREA_TAKEN: spec("CONFLICT", "This outlet already has a floor section with that name."),
+  NIVAAS_AREA_ORDER_TAKEN: spec(
+    "CONFLICT",
+    "That position is already taken by another section of this floor.",
+  ),
+  NIVAAS_AREA_NOT_EMPTY: spec(
+    "CONFLICT",
+    "Retire or move this section's tables before retiring the section.",
+  ),
+  NIVAAS_AREA_UNAVAILABLE: spec(
+    "CONFLICT",
+    "That floor section has been retired, so it cannot take a table.",
+  ),
+  NIVAAS_AREA_NOT_IN_OUTLET: spec(
+    "VALIDATION_FAILED",
+    "That floor section is not part of this outlet, so the table cannot move there.",
+  ),
+  NIVAAS_TABLE_TAKEN: spec(
+    "CONFLICT",
+    "Another live table on this floor already uses that name or code.",
+  ),
+  NIVAAS_TABLE_ORDER_TAKEN: spec(
+    "CONFLICT",
+    "That position is already taken by another table in this section.",
+  ),
+  NIVAAS_TABLE_IN_USE: spec(
+    "CONFLICT",
+    "This table is not free, so it cannot be retired. Set it back to available first.",
+  ),
+  NIVAAS_INVALID_PERMUTATION: spec(
+    "VALIDATION_FAILED",
+    "List every entry in that order exactly once, in the sequence you want.",
+  ),
+  NIVAAS_INVALID_TABLE_NAME: spec("VALIDATION_FAILED", "Enter a table name of up to 60 characters."),
+  NIVAAS_INVALID_TABLE_CODE: spec(
+    "VALIDATION_FAILED",
+    "A table code starts with a letter or number and uses up to 24 letters, numbers, dots, hyphens or underscores.",
+  ),
+  NIVAAS_INVALID_CAPACITY: spec("VALIDATION_FAILED", "A table seats between 1 and 100 covers."),
+  NIVAAS_INVALID_SHAPE: spec("VALIDATION_FAILED", "Choose a shape the floor map can draw."),
+  NIVAAS_INVALID_POSITION: spec(
+    "VALIDATION_FAILED",
+    "A table position is a spot on the floor map, between 0 and 10000.",
+  ),
+
   // ---- lookups
   NIVAAS_NOT_FOUND: spec("RESOURCE_NOT_FOUND", "That record could not be found."),
   NIVAAS_ROLE_NOT_FOUND: spec("RESOURCE_NOT_FOUND", "That role is no longer available."),
@@ -204,6 +308,13 @@ export const DOOR_ERRORS: Record<string, DoorErrorSpec> = {
   NIVAAS_PERMISSION_ORPHAN: spec(
     "INTERNAL",
     "The role and permission data in this database is incomplete.",
+  ),
+  // 013's own ladder assertions: the seed applied, but not in the shape the restaurant
+  // depends on (a kitchen holding a money verb, a staff member able to void). Nothing a
+  // user did; the tenant must not be run on a half-seeded permission table.
+  NIVAAS_PERMISSION_LADDER_BROKEN: spec(
+    "INTERNAL",
+    "The restaurant permissions in this database are incomplete. Please contact support.",
   ),
 };
 

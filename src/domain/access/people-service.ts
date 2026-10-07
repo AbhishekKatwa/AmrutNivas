@@ -24,6 +24,7 @@ import { callDoorRow, camelRows } from "@/db/rpc";
 import type {
   EntityId,
   Invitation,
+  InvitationStatus,
   IssuedInvitation,
   Membership,
   MembershipStatus,
@@ -63,10 +64,18 @@ export type MemberStatusResult = {
   status: SettableMembershipStatus;
 };
 
-/** `cancel_invitation`'s whole answer. */
+/**
+ * `cancel_invitation`'s whole answer.
+ *
+ * 012 made the outcome depend on WHO asked: the inviter's own withdrawal is `CANCELLED`,
+ * a second holder of `user.invite` killing someone else's invitation is `REVOKED`, and the
+ * two are audited under different verbs. They are also different facts for a screen — one is
+ * "changed their mind", the other is "an administrator overrode them" — so a UI that folds
+ * them into one row is hiding the thing an operator would want to know.
+ */
 export type CancelledInvitation = {
   invitationId: EntityId;
-  status: "CANCELLED";
+  status: Extract<InvitationStatus, "CANCELLED" | "REVOKED">;
 };
 
 /** `accept_invitation`'s answer: which tenant the person landed in, and at what level. */
@@ -102,12 +111,24 @@ const MEMBERSHIP_COLUMNS =
  */
 const INVITATION_COLUMNS = "id, organization_id, email, phone, full_name, role_id, property_ids, outlet_ids, status, invited_by, expires_at, accepted_at, accepted_by, created_at, updated_at";
 
-/** A `profiles` row as stored. `full_name` is `not null default ''`, so it is never null here. */
+/**
+ * A `profiles` row as stored, narrowed to what a roster shows.
+ *
+ * `fullName` is 002's `not null default ''`, so it is never null here. `displayName` is 008's
+ * GENERATED column — full name pair, then `full_name`, then the email's local part — so it is
+ * always present and must never be written. `lastLoginAt` is the §64 "Last activity" field,
+ * and NULL legitimately means "no sign-in has been recorded", not "inactive".
+ */
 type ProfileRow = {
   id: EntityId;
   email: string;
   fullName: string;
+  displayName: string;
+  lastLoginAt: string | null;
 };
+
+/** The columns `listMembers` reads from `profiles`. One literal, never a concatenation. */
+const PROFILE_COLUMNS = "id, email, full_name, display_name, last_login_at";
 
 /** The 002 row itself plus the ordering column; `joinedAt` is NULL until a join. */
 type MembershipRow = Omit<Membership, "member"> & {
@@ -146,7 +167,7 @@ export async function listMembers(organizationId: EntityId): Promise<Membership[
   const people = await camelRows<ProfileRow>(
     requireSupabase()
       .from("profiles")
-      .select("id, email, full_name")
+      .select(PROFILE_COLUMNS)
       .in("id", found.map((row) => row.userId)),
   );
   const byId = new Map(people.map((row) => [row.id, row]));
@@ -167,29 +188,126 @@ export async function listMembers(organizationId: EntityId): Promise<Membership[
   }));
 }
 
-/** `Pick<UserAccount, "id" | "email" | "fullName">`, or absent when the row was unreadable. */
+/**
+ * The `Membership["member"]` projection of a profile row, or absent when the row was unreadable.
+ *
+ * Exactly the five fields the roster needs, listed rather than spread: a profile carries
+ * locale, timezone and avatar, and copying a whole row into a membership would make the
+ * membership look like it owns them.
+ */
 function pickMember(profile: ProfileRow | undefined): Membership["member"] {
-  return profile === undefined
-    ? undefined
-    : { id: profile.id, email: profile.email, fullName: profile.fullName };
+  if (profile === undefined) return undefined;
+  return {
+    id: profile.id,
+    email: profile.email,
+    fullName: profile.fullName,
+    displayName: profile.displayName,
+    lastLoginAt: profile.lastLoginAt,
+  };
+}
+
+/**
+ * Every invitation this tenant has ever sent, newest first.
+ *
+ * §66 asks for Pending / Accepted / Expired / Cancelled / Revoked in one list, which means
+ * reading the whole status vocabulary rather than only the open rows: an operator who has to
+ * guess whether a person "never got the link" or "let it lapse" is an operator who re-invites
+ * somebody who already declined. `token_hash` is still never selected — 012 changed the
+ * lifecycle, not the fact that a listing has no business carrying a credential digest out of
+ * the database, even a one-way one.
+ *
+ * Pass `statuses` to narrow it. An empty array returns nothing rather than everything: a
+ * caller that asks for no statuses means no statuses, and silently widening that to the full
+ * table is how a filtered view leaks.
+ */
+export async function listInvitations(
+  organizationId: EntityId,
+  statuses?: readonly InvitationStatus[],
+): Promise<Invitation[]> {
+  if (statuses !== undefined && statuses.length === 0) return [];
+
+  let query = requireSupabase()
+    .from("invitations")
+    .select(INVITATION_COLUMNS)
+    .eq("organization_id", organizationId);
+
+  if (statuses !== undefined) query = query.in("status", [...statuses]);
+
+  return camelRows<Invitation>(
+    query.order("created_at", { ascending: false }).order("id", { ascending: false }),
+  );
 }
 
 /**
  * The invitations a re-invite would collide with — `NIVAAS_ALREADY_INVITED` is exactly
- * "one of these already exists". Newest first, and `token_hash` is never selected: the
- * table stores only the digest of a credential, and a listing screen has no reason to
- * carry it out of the database at all.
+ * "one of these already exists".
+ *
+ * A thin specialization of `listInvitations`, kept because every caller wants only the open
+ * rows and because `INVITED` is the single status 012's partial unique index counts.
  */
 export async function listPendingInvitations(organizationId: EntityId): Promise<Invitation[]> {
-  return camelRows<Invitation>(
-    requireSupabase()
-      .from("invitations")
-      .select(INVITATION_COLUMNS)
-      .eq("organization_id", organizationId)
-      .eq("status", "INVITED")
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false }),
-  );
+  return listInvitations(organizationId, ["INVITED"]);
+}
+
+/**
+ * Whether a row the database still calls `INVITED` is open right now.
+ *
+ * 012's headline: expiry is a sweep, not a trigger, so between the last sweep and the next one
+ * a lapsed link is stored as `INVITED` while `accept_invitation` would answer
+ * `NIVAAS_INVITATION_EXPIRED`. A roster that renders the stored status would promise "Pending"
+ * next to a link that cannot work — so the effective status is computed here, in one place,
+ * and the test asserts the boundary rather than a comment claiming it.
+ *
+ * `now` is a parameter for exactly that reason: production always reads the wall clock, and a
+ * test must be able to stand one second either side of `expiresAt`.
+ */
+export function invitationIsUsable(
+  invitation: Pick<Invitation, "status" | "expiresAt">,
+  now: Date = new Date(),
+): boolean {
+  if (invitation.status !== "INVITED") return false;
+  const expiresAt = new Date(invitation.expiresAt);
+  if (Number.isNaN(expiresAt.getTime())) return true;
+  return expiresAt.getTime() > now.getTime();
+}
+
+/**
+ * The status a §66 list should show, which is not always the stored one.
+ *
+ * `INVITED` whose `expiresAt` has passed reads as `EXPIRED`, because that is what the door
+ * will do to it on the next sweep or the next attempt to use it. Every other status is
+ * reported as stored: `CANCELLED` and `REVOKED` stay distinct, since they answer different
+ * questions ("who withdrew this?") and 012 audits them as different events.
+ */
+export function effectiveInvitationStatus(
+  invitation: Pick<Invitation, "status" | "expiresAt">,
+  now: Date = new Date(),
+): InvitationStatus {
+  if (invitation.status === "INVITED" && !invitationIsUsable(invitation, now)) {
+    return "EXPIRED";
+  }
+  return invitation.status;
+}
+
+/**
+ * What to tell an operator about how an invitation ended.
+ *
+ * `CANCELLED` and `REVOKED` are different outcomes with different actors, so they get
+ * different sentences; folding them together would hide the fact that a colleague overrode
+ * the person who sent the link. Nothing here names an internal token, and none of these
+ * strings may be used as a gate — they are copy.
+ */
+export const INVITATION_OUTCOME_COPY: Readonly<Record<InvitationStatus, string>> = {
+  INVITED: "Waiting for the invite to be accepted.",
+  ACCEPTED: "Accepted — this person has a seat in the organization.",
+  EXPIRED: "The link's validity window ran out before it was used.",
+  CANCELLED: "Withdrawn by the person who sent it.",
+  REVOKED: "Withdrawn by another administrator.",
+};
+
+/** The label for the lifecycle column: Pending is what an open `INVITED` row is called. */
+export function invitationStatusLabel(status: InvitationStatus): string {
+  return status === "INVITED" ? "Pending" : status.charAt(0) + status.slice(1).toLowerCase();
 }
 
 /* -------------------------------------------------------------------- writes */

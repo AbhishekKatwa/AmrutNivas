@@ -432,95 +432,9 @@ create trigger menu_item_prices_chain before insert or update on public.menu_ite
 
 -- ===================================================================== chain
 
--- The row-level twin of app.assert_org_chain(): each menu table's denormalized
--- (organization_id, property_id, outlet_id) must equal the parent's, and the immediate
--- parent must itself be inside the scope it claims. Without this, a client-crafted ancestor
--- id could leak a row into another tenant — the invariant that makes the RLS predicate sound.
-create or replace function app.assert_menu_chain()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_org  uuid;
-  v_prop uuid;
-  v_out  uuid;
-begin
-  if TG_TABLE_NAME = 'menus' then
-    select o.organization_id, o.property_id, o.id into v_org, v_prop, v_out
-      from public.outlets o where o.id = new.outlet_id;
-    if v_out is null then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: outlet % does not exist', new.outlet_id;
-    end if;
-
-  elsif TG_TABLE_NAME = 'menu_categories' then
-    select m.organization_id, m.property_id, m.outlet_id into v_org, v_prop, v_out
-      from public.menus m where m.id = new.menu_id;
-    if v_out is null then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: menu % does not exist', new.menu_id;
-    end if;
-
-  elsif TG_TABLE_NAME = 'menu_items' then
-    select m.organization_id, m.property_id, m.outlet_id into v_org, v_prop, v_out
-      from public.menus m where m.id = new.menu_id;
-    if v_out is null then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: menu % does not exist', new.menu_id;
-    end if;
-    -- A category, when set, must be one of the same menu.
-    if new.category_id is not null then
-      perform 1 from public.menu_categories c
-        where c.id = new.category_id and c.menu_id = new.menu_id;
-      if not found then
-        raise exception 'NIVAAS_SCOPE_MISMATCH: category is not in this menu';
-      end if;
-    end if;
-
-  elsif TG_TABLE_NAME = 'modifier_groups' then
-    select i.organization_id, i.property_id, i.outlet_id into v_org, v_prop, v_out
-      from public.menu_items i where i.id = new.menu_item_id;
-    if v_out is null then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: menu item % does not exist', new.menu_item_id;
-    end if;
-    if new.menu_id is distinct from (select i.menu_id from public.menu_items i where i.id = new.menu_item_id) then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: group menu does not match its item menu';
-    end if;
-
-  elsif TG_TABLE_NAME = 'modifiers' then
-    select g.organization_id, g.property_id, g.outlet_id into v_org, v_prop, v_out
-      from public.modifier_groups g where g.id = new.group_id;
-    if v_out is null then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: modifier group % does not exist', new.group_id;
-    end if;
-    if new.menu_item_id is distinct from (select g.menu_item_id from public.modifier_groups g where g.id = new.group_id) then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: modifier item does not match its group item';
-    end if;
-    if new.menu_id is distinct from (select g.menu_id from public.modifier_groups g where g.id = new.group_id) then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: modifier menu does not match its group menu';
-    end if;
-
-  elsif TG_TABLE_NAME = 'menu_item_prices' then
-    select i.organization_id, i.property_id, i.outlet_id into v_org, v_prop, v_out
-      from public.menu_items i where i.id = new.menu_item_id;
-    if v_out is null then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: menu item % does not exist', new.menu_item_id;
-    end if;
-    if new.menu_id is distinct from (select i.menu_id from public.menu_items i where i.id = new.menu_item_id) then
-      raise exception 'NIVAAS_SCOPE_MISMATCH: price menu does not match its item menu';
-    end if;
-
-  else
-    raise exception 'NIVAAS_SCOPE_MISMATCH: unhandled menu table %', TG_TABLE_NAME;
-  end if;
-
-  -- Now the copied-ancestor columns must match what the parent actually says.
-  if new.organization_id <> v_org or new.property_id <> v_prop or new.outlet_id <> v_out then
-    raise exception 'NIVAAS_SCOPE_MISMATCH: denormalized tenant chain disagrees with the parent';
-  end if;
-
-  return new;
-end;
-$$;
+-- app.assert_menu_chain() is defined above, before the tables that attach it. Each of the six
+-- menu tables carries a `<table>_chain` trigger running it on insert/update; the per-table
+-- attach statements live with their CREATE TABLE blocks.
 
 -- ======================================================================= rls
 
@@ -1627,13 +1541,24 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_org uuid;
-  v_row jsonb;
+  v_actor uuid := app.require_session();
+  v_org   uuid;
+  v_prop  uuid;
+  v_out   uuid;
+  v_row   jsonb;
 begin
-  select i.organization_id into v_org from public.menu_items i where i.id = p_item;
+  select i.organization_id, i.property_id, i.outlet_id into v_org, v_prop, v_out
+    from public.menu_items i where i.id = p_item;
   perform app.require_valid(v_org is not null, 'NIVAAS_NOT_FOUND');
   perform app.require_tenant_visibility(v_org);
-  perform app.require_permission('menu.view', v_org);
+  -- An item outside the caller's outlets is invisible, not merely denied — the same wall
+  -- RLS puts on a direct SELECT, so the helper cannot see a row the table hides.
+  perform app.require_valid(app.can_access_outlet(v_actor, v_out), 'NIVAAS_NOT_FOUND');
+  -- The full chain, not the organization alone: `menu.view` is held at OUTLET scope by a
+  -- restaurant/kitchen manager and at PROPERTY scope by a general manager, and has_permission
+  -- only fires those grants when the matching property/outlet is named. Checking org-only
+  -- would answer NIVAAS_ACCESS_DENIED to the very people the read path exists to serve.
+  perform app.require_permission('menu.view', v_org, v_prop, v_out);
 
   select to_jsonb(pr) into v_row
     from public.menu_item_prices pr
@@ -1657,14 +1582,23 @@ as $$
 declare
   v_actor uuid := app.require_session();
   v_org   uuid;
+  v_prop  uuid;
+  v_out   uuid;
   v_item  jsonb;
   v_price jsonb;
   v_groups jsonb;
 begin
-  select i.organization_id into v_org from public.menu_items i where i.id = p_item;
+  select i.organization_id, i.property_id, i.outlet_id into v_org, v_prop, v_out
+    from public.menu_items i where i.id = p_item;
   perform app.require_valid(v_org is not null, 'NIVAAS_NOT_FOUND');
   perform app.require_tenant_visibility(v_org);
-  perform app.require_permission('menu.view', v_org);
+  -- Outside the caller's outlets the item does not exist (mirrors the RLS read policy), so a
+  -- cross-outlet probe cannot enumerate ids even inside its own tenant.
+  perform app.require_valid(app.can_access_outlet(v_actor, v_out), 'NIVAAS_NOT_FOUND');
+  -- Checked at the item's own property/outlet: restaurant and kitchen managers hold
+  -- `menu.view` at OUTLET scope and general managers at PROPERTY scope, and those grants
+  -- resolve only when the location is named. An organization-only check denies them.
+  perform app.require_permission('menu.view', v_org, v_prop, v_out);
 
   select to_jsonb(i) into v_item from public.menu_items i where i.id = p_item;
   select to_jsonb(pr) into v_price

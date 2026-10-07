@@ -14,7 +14,9 @@ import {
   listGrants,
   listOutletAccess,
   listPropertyAccess,
+  listRolePermissions,
   listRoles,
+  listTenantRoles,
   revokeRole,
   setOutletAccess,
   setPropertyAccess,
@@ -34,6 +36,7 @@ const OUTLET = "a2000000-0000-4000-8000-000000000001";
 const USER = "b0000000-0000-4000-8000-000000000002";
 const GRANT = "f0000000-0000-4000-8000-000000000001";
 const ROLE_ID = "e0000000-0000-4000-8000-000000000001";
+const OTHER_ROLE_ID = "e0000000-0000-4000-8000-000000000002";
 
 let stub: BackendStub;
 
@@ -84,6 +87,95 @@ describe("listRoles", () => {
         status: "ACTIVE",
       },
     ]);
+  });
+});
+
+describe("listTenantRoles — the roles 011 lets a tenant own", () => {
+  const tenantRoleRow = {
+    id: ROLE_ID,
+    name: "NIGHT_AUDITOR",
+    display_name: "Night Auditor",
+    description: "Audits the close at one site.",
+    scope_level: "PROPERTY",
+    organization_id: ORG,
+    is_system: false,
+    status: "ACTIVE",
+  };
+
+  it("asks for this tenant's own roles, retired ones included", async () => {
+    stub = stubBackend({ reads: () => [tenantRoleRow], doors: () => undefined });
+    setSupabaseClientForTests(stub.client);
+
+    const roles = await listTenantRoles(ORG);
+
+    // `is_system = false` is the tenancy filter, not `organization_id` alone: 003's policy
+    // keeps a tenant's rows inside the tenant, and this read must not accidentally return the
+    // platform catalogue alongside them.
+    expect(steps()).toContainEqual(["eq", ["organization_id", ORG]]);
+    expect(steps()).toContainEqual(["eq", ["is_system", false]]);
+    // Retired roles stay listable on purpose — `user_roles` rows still point at them and §53
+    // wants "who held what, when" answerable rather than a role that appears to have vanished.
+    expect(steps().some(([method, args]) => method === "eq" && args[0] === "status")).toBe(false);
+    expect(roles).toEqual([
+      {
+        id: ROLE_ID,
+        name: "NIGHT_AUDITOR",
+        displayName: "Night Auditor",
+        description: "Audits the close at one site.",
+        scopeLevel: "PROPERTY",
+        organizationId: ORG,
+        isSystem: false,
+        status: "ACTIVE",
+      },
+    ]);
+  });
+
+  it("does not read seniority or owner_class into the client mirror", async () => {
+    // 009's ladder columns decide who may grant a role. They are the doors' arithmetic and a
+    // screen must not invite an operator to reason about a number they cannot verify, so the
+    // column list is stated rather than `*` and the test is what keeps it that way.
+    stub = stubBackend({ reads: () => [], doors: () => undefined });
+    setSupabaseClientForTests(stub.client);
+
+    await listTenantRoles(ORG);
+
+    expect(stub.queries[0].columns).not.toContain("*");
+    expect(stub.queries[0].columns).not.toContain("seniority");
+    expect(stub.queries[0].columns).not.toContain("owner_class");
+  });
+});
+
+describe("listRolePermissions", () => {
+  it("reads what a set of roles grants, which 003 lets anyone who sees the role see", async () => {
+    stub = stubBackend({
+      reads: () => [
+        { role_id: ROLE_ID, permission: "audit.view" },
+        { role_id: ROLE_ID, permission: "stock.adjust" },
+      ],
+      doors: () => undefined,
+    });
+    setSupabaseClientForTests(stub.client);
+
+    const grants = await listRolePermissions([ROLE_ID, OTHER_ROLE_ID]);
+
+    expect(stub.queries[0].table).toBe("role_permissions");
+    expect(stub.queries[0].steps).toContainEqual(["in", ["role_id", [ROLE_ID, OTHER_ROLE_ID]]]);
+    // The positive case: the keys arrive mapped to the domain's spelling, so a screen can put
+    // them straight through `describePermission` without a second conversion.
+    expect(grants).toEqual([
+      { roleId: ROLE_ID, permission: "audit.view" },
+      { roleId: ROLE_ID, permission: "stock.adjust" },
+    ]);
+  });
+
+  it("asks the database nothing when there are no roles to describe", async () => {
+    // `.in("role_id", [])` is a filter nothing can satisfy; it still costs a round trip and it
+    // would make an empty Roles screen look like it queried. No input, no query.
+    stub = stubBackend({ reads: () => [], doors: () => undefined });
+    setSupabaseClientForTests(stub.client);
+
+    await expect(listRolePermissions([])).resolves.toEqual([]);
+    expect(stub.queries).toHaveLength(0);
   });
 });
 

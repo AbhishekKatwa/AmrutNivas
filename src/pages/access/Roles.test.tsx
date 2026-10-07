@@ -116,7 +116,7 @@ describe("RolesPage honest states", () => {
     expect(html).toContain("role.view");
   });
 
-  it("renders the catalogue and points to the seed that holds the matrix", () => {
+  it("renders the catalogue and points to the live permission table", () => {
     useContextStore.setState({
       status: "ready",
       context: { signedIn: true, organizationId: "org-1", propertyId: null, outletId: null, cleared: false },
@@ -128,8 +128,12 @@ describe("RolesPage honest states", () => {
       },
     });
     const html = render();
-    expect(html).toContain("System roles");
-    expect(html).toContain("006_seed_rbac.sql");
+    // The header no longer reads "System roles" (the section covers both system AND tenant
+    // roles) and no longer names 006_seed_rbac.sql (the live answer is `role_permissions`,
+    // which the footer cites directly). The retained claim — a System role is read-only
+    // because 011 refuses catalogue edits from a screen — is still on the page verbatim.
+    expect(html).toContain("A System role is read-only");
+    expect(html).toContain("role_permissions");
     expect(html).toContain("People &amp; grants");
   });
 });

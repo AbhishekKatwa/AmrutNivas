@@ -47,6 +47,43 @@ export const CLIENT_DOORS = [
   // guards pre-flight with, and the login/logout footprint the auth adapter writes
   "evaluate_access",
   "record_auth_event",
+  // menu (014) — Prompt #04's first domain. `menu_snapshot` and `menu_item_current_price`
+  // are reads that go through a door rather than a table because a bill line must be
+  // priced from the snapshot the kitchen served, not from whatever the price row is
+  // today; both are SECURITY DEFINER for that reason.
+  "create_menu",
+  "set_menu_status",
+  "create_menu_category",
+  "update_menu_category",
+  "archive_menu_category",
+  "reorder_menu_categories",
+  "create_menu_item",
+  "update_menu_item",
+  "archive_menu_item",
+  "set_menu_item_availability",
+  "set_menu_item_price",
+  "menu_item_current_price",
+  "create_modifier_group",
+  "update_modifier_group",
+  "archive_modifier_group",
+  "create_modifier",
+  "update_modifier",
+  "archive_modifier",
+  "menu_snapshot",
+  // dining areas and tables (015) — Prompt #04 §18-§22's floor. One section level and the
+  // covers in it. There is deliberately no read door in this group: the floor map is a plain
+  // SELECT on `dining_areas` and `restaurant_tables` under their outlet policies, and
+  // `set_table_service_status` is the only operational write a person gets — OCCUPIED and
+  // RESERVED are derived states (016, #08) and no door here can be asked to write them.
+  "create_dining_area",
+  "update_dining_area",
+  "archive_dining_area",
+  "reorder_dining_areas",
+  "create_restaurant_table",
+  "update_restaurant_table",
+  "reorder_restaurant_tables",
+  "archive_restaurant_table",
+  "set_table_service_status",
   // development seed only (007)
   "claim_demo_organization",
 ] as const;

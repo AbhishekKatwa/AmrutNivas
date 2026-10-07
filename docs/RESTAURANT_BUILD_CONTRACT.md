@@ -7,8 +7,14 @@ migration wins and this file is corrected.
 
 ## 1. Money is never a float
 
-- Postgres: `numeric` with an explicit scale (`numeric(12,2)` for rupee amounts) plus a
-  `currency` column on every money-bearing row. No `real`, no `double precision`.
+- Postgres: **unconstrained `numeric` + a scale CHECK**, plus a `currency` column on every
+  money-bearing row. No `real`, no `double precision`, and **no `numeric(p,s)`**: a precisioned
+  column silently *rounds* an over-scale input to fit (`1.239` → `1.24`), which is how a
+  sub-cent error disappears instead of being refused. `014` established the shape —
+  `CHECK (scale(trim_scale(col)) <= 2)` plus a magnitude bound — so a genuine third decimal
+  raises `NIVAAS_INVALID_MONEY` while a harmless trailing zero (`19.9900`) is accepted
+  losslessly. Its tail asserts the wall exists on every money column, because 012's lesson was
+  that an intended constraint is not an enforced one.
 - Doors return money as **strings** (`x::text` / `to_char`), never as raw JSON numbers: a
   `jsonb` numeric crosses into JavaScript as a float and that is how ₹280 becomes
   `279.99999999999994` on a bill.

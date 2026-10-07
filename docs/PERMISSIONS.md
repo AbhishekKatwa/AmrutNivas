@@ -8,32 +8,45 @@ ladder — is in [SECURITY.md](./SECURITY.md).
 **One source of truth, diffed against the SQL.** The grantable set is the distinct
 `role_permissions.permission` values in the migrations: 25 seeded by `db/supabase/006_seed_rbac.sql`
 (which self-checks `count(*) = 25`) plus `role.create` and `role.edit` inserted by
-`db/supabase/011_custom_roles.sql` — 27 total. The client labels them in
-`PERMISSION_CATALOGUE` (`src/domain/identity/permissions.ts`) and `permissions.test.ts` re-reads both
-SQL files and diffs them against that list **in both directions**, so a seed that gains or drops a
-token fails the build instead of shipping a button the doors refuse, or a document naming a capability
-nobody can grant. The answer to "may I?" never comes from this page or from that file — it comes from
-`my_permissions` / `evaluate_access` server-side.
+`db/supabase/011_custom_roles.sql` — 27 for Prompt #03 — plus the 27 restaurant tokens seeded by
+`db/supabase/013_restaurant_permissions.sql` (which self-checks its own count *and* the resulting total
+of 54). 54 in all. The client labels them in `PERMISSION_CATALOGUE`
+(`src/domain/identity/permissions.ts`) and `permissions.test.ts` re-reads all three SQL files and diffs
+them against that list **in both directions**, so a seed that gains or drops a token fails the build
+instead of shipping a button the doors refuse, or a document naming a capability nobody can grant. The
+answer to "may I?" never comes from this page or from that file — it comes from `my_permissions` /
+`evaluate_access` server-side.
 
 **Format.** Every key is `domain.verb`: one lowercase segment, one dot, one verb, enforced by the 002
 column CHECK and mirrored once as `PERMISSION_PATTERN` (`src/domain/identity/types.ts:373`). A
 well-shaped but unseeded key is still refused — `isPermissionKey()` requires membership in the
-catalogue, because the donor shipped gates on tokens no role could ever hold.
+catalogue, because the donor shipped gates on tokens no role could ever hold. Prompt #04 §5 writes its
+keys in three segments (`restaurant.menu.view`); the CHECK refuses a second dot at insert time, so
+`013` flattens them to `menu.view` — the same treatment `property.manage_access` and
+`outlet.manage_access` already give a parent concept: prefix, not level.
 
 **Not yet in the catalogue (do not gate on these):** `audit.export` (Prompt #03 §58's example — only
-`audit.view` is seeded), every restaurant capability (`menu.*`, `table.*`, `order.*`, `kitchen.*`,
-`discount.*`) which arrives with **Prompt #04**, `organization.manageUsers` (deliberately not seeded —
-it is a bundle of `user.invite`/`user.suspend`/`user.remove`/`role.assign` that the doors already
-check individually), and any `department`-scoped grant (department *keys* exist, but a role scoped to
-DEPARTMENT cannot be granted — see SECURITY.md §7).
+`audit.view` is seeded), `organization.manageUsers` (deliberately not seeded — it is a bundle of
+`user.invite`/`user.suspend`/`user.remove`/`role.assign` that the doors already check individually),
+and any `department`-scoped grant (department *keys* exist, but a role scoped to DEPARTMENT cannot be
+granted — see SECURITY.md §7). There is no `kitchen.*` or `discount.*` family and never will be: the
+verbs are `kot.*`, and discounting is a named verb on the thing being discounted
+(`order.discount`/`bill.discount`).
 
 ---
 
-## The 27 permissions
+## The 54 permissions
 
-"Holds it" lists the system roles seeded with the key (`006` matrix, plus `role.create`/`role.edit`
-from `011`). A `PLATFORM_ADMIN` additionally resolves **all 27** through the whole-catalogue arm of
-`my_permissions` (`008:289-295`), even though only four are seeded on it.
+"Holds it" lists the system roles seeded with the key (`006` matrix, `role.create`/`role.edit` from
+`011`, and the restaurant ladder from `013`). A `PLATFORM_ADMIN` additionally resolves **all 54**
+through the whole-catalogue arm of `my_permissions` (`008:289-295`), even though only four are seeded
+on it; `013` therefore grants it no restaurant token explicitly.
+
+For the restaurant tables below, `ORG_OWNER · ORG_ADMIN · GENERAL_MANAGER · PROPERTY_MANAGER ·
+RESTAURANT_MANAGER` hold **every one of the 27 tokens**, so they are not repeated row by row. The
+abbreviations list the partial holders: **KM** = KITCHEN_MANAGER (7), **ST** = STAFF (11),
+**EM** = EVENT_MANAGER (14), **FM** = FINANCE_MANAGER (5). HOUSEKEEPING_MANAGER, STORE_MANAGER and
+HR_MANAGER hold no restaurant token — their remit does not include the floor.
 
 ### Organization
 
@@ -81,6 +94,89 @@ They are not the same thing as a DEPARTMENT-scope **grant**: `assign_role` refus
 whose `scope_level` is DEPARTMENT (`NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED`), because `my_permissions`
 resolves grants at organization/property/outlet only. SECURITY.md §7 explains why this is a decision,
 not a bug.
+
+### Restaurant — Prompt #04 (`013`)
+
+`restaurant.view` is the entry door: it opens the module for the outlets a person can reach, and each
+area below then answers for itself.
+
+| Key | Allows | Also held by |
+|---|---|---|
+| `restaurant.view` | Open the restaurant module for the outlets you can reach | KM, ST, EM, FM |
+
+**Menu.** `menu.edit` is the availability door and `menu.publish` is the price-and-service door; the
+split is why a kitchen manager can mark a dish out of stock without being able to change what it costs
+the counter.
+
+| Key | Allows | Also held by |
+|---|---|---|
+| `menu.view` | See the menu: categories, items, modifiers and prices | KM, ST, EM, FM |
+| `menu.create` | Add categories, items, modifier groups and modifiers | EM |
+| `menu.edit` | Change a menu item's details, availability and pricing | KM, EM |
+| `menu.archive` | Retire a category or item so it can no longer be ordered | EM |
+| `menu.publish` | Put a menu or price change in front of the counter for service | — |
+
+**Table.**
+
+| Key | Allows | Also held by |
+|---|---|---|
+| `table.view` | See the floor plan, its tables and how each one stands | ST, EM |
+| `table.create` | Add dining areas and tables to an outlet's floor | EM |
+| `table.edit` | Change a table's name, capacity, position or display order | EM |
+| `table.archive` | Retire a table so it stops showing on the floor | — |
+
+**Order.** `order.cancel` and `order.void` are separate verbs on purpose: #04 §53 treats a void as the
+more sensitive reversal, so a role that may cancel an order must be granted the reversal on its own
+terms.
+
+| Key | Allows | Also held by |
+|---|---|---|
+| `order.view` | See orders with their items, amounts and current status | ST, EM, FM |
+| `order.create` | Open a new order and add items to it | ST, EM |
+| `order.edit` | Change an order while its status still allows the change | ST, EM |
+| `order.cancel` | Cancel an order at a stage where cancellation is permitted | — |
+| `order.discount` | Apply a percentage or fixed discount to an order or a line | — |
+| `order.void` | Void an order — a privileged reversal, taken for a recorded reason | — |
+
+**KOT** (kitchen order tickets).
+
+| Key | Allows | Also held by |
+|---|---|---|
+| `kot.view` | See kitchen order tickets and how far each has come | KM, EM |
+| `kot.create` | Send an order's items to the kitchen as a KOT | KM, ST, EM |
+| `kot.reprint` | Reprint a ticket for the pass | KM |
+| `kot.cancel` | Cancel a ticket the kitchen has not served | KM |
+
+**Bill.**
+
+| Key | Allows | Also held by |
+|---|---|---|
+| `bill.view` | See a bill and its lines, discounts and totals | ST, EM, FM |
+| `bill.create` | Open a bill for an order | ST |
+| `bill.discount` | Discount a bill | — |
+| `bill.void` | Void a bill — a privileged reversal, taken for a recorded reason | — |
+
+**Payment.**
+
+| Key | Allows | Also held by |
+|---|---|---|
+| `payment.view` | See payments taken against a bill | ST, FM |
+| `payment.create` | Take a payment | ST |
+| `payment.refund` | Refund a payment — a privileged reversal, taken for a recorded reason | — |
+
+The seed asserts its own ladder (`013:193-251`), so a half-applied grant table fails the migration
+rather than quietly handing a kitchen the till:
+
+- KITCHEN_MANAGER and STAFF hold **none** of `payment.refund`, `order.discount`, `order.void`,
+  `bill.void`, `bill.discount` (`NIVAAS_PERMISSION_LADDER_BROKEN`).
+- KITCHEN_MANAGER holds **no money verb at all** — not even the `bill.view`/`payment.view` reads — and
+  cannot `menu.publish`.
+- STAFF can open a bill and take a payment but never void one.
+
+The five reversals above (`order.discount`, `order.void`, `bill.discount`, `bill.void`,
+`payment.refund`) and `menu.publish`/`table.archive` therefore stop at manager level and above. Note
+that FM reads the money but does not move it: a refund is an outlet's operational act, not a
+back-office one.
 
 ### User
 
@@ -178,5 +274,7 @@ Add a token by seeding it into `role_permissions` in a numbered migration **and*
 entry to `PERMISSION_CATALOGUE`, then re-run `permissions.test.ts`. The test is the contract: a token
 in the SQL with no client entry, or a client entry with no SQL, fails the build. New first segments
 also extend `PermissionDomain` in `permissions.ts`. Do not invent arbitrary permission patterns — the
-domains present today are `organization · property · outlet · department · user · role · audit ·
-platform`, and Prompt #04 will add the restaurant domains on the same `domain.verb` shape.
+domains present today are `organization · property · outlet · department · restaurant · menu · table ·
+order · kot · bill · payment · user · role · audit · platform`, all on the same `domain.verb` shape.
+A later prompt that adds an area adds verbs inside it; the 002 CHECK is what keeps a three-segment key
+from ever reaching the database.

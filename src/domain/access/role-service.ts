@@ -29,6 +29,7 @@ import type {
   PropertyAccessMode,
   Role,
   RoleGrant,
+  RolePermission,
   ScopeLevel,
 } from "@/domain/identity/types";
 
@@ -186,6 +187,58 @@ export async function listGrants(
       role: { name: role.name, displayName: role.displayName, scopeLevel: role.scopeLevel },
     };
   });
+}
+
+/**
+ * The roles this tenant created itself, retired ones included.
+ *
+ * `listRoles` deliberately shows only ACTIVE system roles, because that is the whole vocabulary
+ * a grant picker used to offer. 011 changed the picture: a tenant now owns rows in `roles`, and
+ * §65's screen has to distinguish them from the platform's catalogue.
+ *
+ * Two things this read does NOT filter, both on purpose:
+ *   - `status`: a retired custom role still has grants pointing at it, and §53 wants that
+ *     history readable, so the Roles screen must be able to show an INACTIVE role rather than
+ *     appear to have lost one. `isSystem` is the filter that matters for tenancy — 003's
+ *     `roles_read` keeps a tenant's rows inside that tenant, so a forgotten predicate here
+ *     cannot reach another group's vocabulary.
+ *   - `organization_id`: supplied by the caller and also the RLS predicate, matching every
+ *     other tenant read in this layer.
+ */
+export async function listTenantRoles(organizationId: EntityId): Promise<Role[]> {
+  return camelRows<Role>(
+    requireSupabase()
+      .from("roles")
+      .select(ROLE_COLUMNS)
+      .eq("organization_id", organizationId)
+      .eq("is_system", false)
+      .order("display_name", { ascending: true }),
+  );
+}
+
+/**
+ * What a set of roles grants — the join that turns a role name into a permission list.
+ *
+ * 003's `role_permissions_read` is written as "whoever may see a role may see what it grants",
+ * so this is a plain SELECT with no door behind it. Callers pass the ids they already hold
+ * (`listRoles`/`listTenantRoles` rows, or the distinct `roleId`s of a `listGrants` result).
+ *
+ * An empty input returns an empty list WITHOUT querying: PostgREST reads `.in("id", [])` as a
+ * filter nothing can satisfy, but it still costs a round trip and, in this transport, still
+ * builds a chain a test would have to account for. The screen that asks for the permissions of
+ * no roles wants no rows, not a query.
+ *
+ * The result is unordered by design; a screen that displays it goes through
+ * `permissionsByDomain` in the identity layer, which owns the display order.
+ */
+export async function listRolePermissions(roleIds: readonly EntityId[]): Promise<RolePermission[]> {
+  if (roleIds.length === 0) return [];
+  return camelRows<RolePermission>(
+    requireSupabase()
+      .from("role_permissions")
+      .select("role_id, permission")
+      .in("role_id", [...roleIds]),
+  );
 }
 
 /** Every person's property breadth inside one tenant, grouped by person then site. */

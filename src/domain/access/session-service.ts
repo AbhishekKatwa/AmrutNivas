@@ -13,6 +13,8 @@
  */
 
 import { callDoor, callDoorRow } from "@/db/rpc";
+import { denialCopy } from "./authorize";
+import { ACCESS_DENIAL_REASONS, type AccessDenialReason } from "@/config/security";
 import type {
   ActiveContext,
   EntityId,
@@ -128,3 +130,79 @@ export async function loadPermissions(
 export async function claimDemoEstate(): Promise<Organization> {
   return callDoorRow<Organization>("claim_demo_organization");
 }
+
+/* ------------------------------------------------------------------ access verdicts */
+
+/** What the caller wants to know, and where. Mirrors `evaluate_access`'s four parameters. */
+export type AccessProbe = {
+  permission: Permission;
+  organizationId: EntityId;
+  propertyId?: EntityId | null;
+  outletId?: EntityId | null;
+};
+
+/**
+ * The server's own answer to "may this session do this, here?".
+ *
+ * `reason` is a §46 code from `ACCESS_DENIAL_REASONS` when the answer is no, and null when it
+ * is yes. It is for a log line and a developer's console; a person sees `accessDenialCopy()`.
+ */
+export type AccessVerdict =
+  | { readonly allowed: true; readonly reason: null }
+  | { readonly allowed: false; readonly reason: AccessDenialReason };
+
+/**
+ * Ask the database why an action is not available.
+ *
+ * WHY THIS EXISTS: `authorize.ts` is a pure mirror of 010's ladder — it decides from FACTS it
+ * is handed, and it cannot fetch one. This is the half that supplies the server's own answer
+ * for the same ladder, so a screen never has to reconstruct `app.has_permission`'s reasoning
+ * from cached booleans and get it subtly wrong. `my_permissions` says what you hold; this says
+ * whether a specific action resolves here, right now, including the property and outlet
+ * breadth checks a permission set does not carry.
+ *
+ * CALLING IT HAS A SIDE EFFECT, so do not call it on render. `evaluate_access` is `volatile`
+ * and records a `DENIED` audit row for every "no" (that is the only way a refusal ever reaches
+ * the trail — a door that refuses does so by raising, which aborts its own transaction along
+ * with any log line it wrote). Ask it when a person actually attempts something, or from an
+ * explicit diagnostic; polling it would fill a tenant's history with denials nobody made.
+ *
+ * It never throws for a denial, and it never confirms another tenant's rows: an out-of-tenant
+ * probe answers no, and 010 deliberately records it WITHOUT that tenant's id so an outsider
+ * cannot write into a stranger's audit log.
+ */
+export async function evaluateAccess(probe: AccessProbe): Promise<AccessVerdict> {
+  const payload = await callDoor<Record<string, unknown>>("evaluate_access", {
+    permission: probe.permission,
+    organization: probe.organizationId,
+    property: probe.propertyId ?? null,
+    outlet: probe.outletId ?? null,
+  });
+
+  if (payload === null || typeof payload !== "object") {
+    // A door that answers nothing answered no: a verdict a screen cannot read is not a
+    // permission, and failing open here would be the worst possible default.
+    return { allowed: false, reason: "PERMISSION_DENIED" };
+  }
+  if (payload.allowed === true) return { allowed: true, reason: null };
+
+  const reason = payload.reason;
+  if (typeof reason === "string" && (ACCESS_DENIAL_REASONS as readonly string[]).includes(reason)) {
+    return { allowed: false, reason: reason as AccessDenialReason };
+  }
+  // An unrecognised code stays a DENIAL with the generic copy rather than an "allowed". The
+  // server's vocabulary may widen in a migration before this client does; the one thing that
+  // must never happen in that window is a screen reading the gap as consent.
+  return { allowed: false, reason: "PERMISSION_DENIED" };
+}
+
+/**
+ * The sentence to show for a verdict, or null when the action is allowed.
+ *
+ * One call site for `DENIAL_MESSAGES` so a screen cannot print a raw reason code — the rule
+ * `authorize.test.ts` enforces on the table itself, applied here to the path that reads it.
+ */
+export function accessDenialCopy(verdict: AccessVerdict): string | null {
+  return verdict.allowed ? null : denialCopy(verdict.reason);
+}
+

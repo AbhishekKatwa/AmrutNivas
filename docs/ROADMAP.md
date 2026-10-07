@@ -1,7 +1,8 @@
 # AMRUT NIVAAS — Roadmap
 
 Sequence fixed by Implementation Prompt #01 §33. **Prompt #02 delivered the tenancy/identity/access layer
-(Phase 0 core); Prompt #03 finishes authentication, then Phase 1 begins.** Each phase lists its exit gate — a
+(Phase 0 core); Prompt #03 delivered the authentication + RBAC + permission + audit hardening; the first
+operational module (Phase 1 restaurant) is Prompt #04.** Each phase lists its exit gate — a
 phase is not "done" because its screens exist, it is done when the gate is true.
 
 The owner also maintains a three-release commercial cut
@@ -20,19 +21,18 @@ Authentication · Organization · Property · Outlet · Department · RBAC · Au
 
 Proven, not asserted:
 
-- **SQL verifier green from a cold rebuild** — `db/verify/tenant_isolation.sql` ("Prompt #02 §80/§81
-  verification: tenant isolation"): **9 scenarios / 78 `PASS` assertions, 0 failures**, re-run cold today
-  (**2026-10-07**) against a real **PostgreSQL 18.3** cluster via `db/harness/local-pg.sh rebuild` (down →
-  up → apply `000`–`007` → verify). The scenarios cover cross-tenant read denial (1), no direct client DML
-  (2), foreign-id refusal at the doors (3), outlet-scoped narrowing inside one tenant (4), a persisted context
-  not outliving the access that justified it (5), suspension removing authority + revoking grants while the
-  login survives (6), the harness identity override being unreachable from a client session (7), the invitation
-  round trip (8), and end-to-end write + archive-not-delete (9).
-- **Client suite green** — `npx vitest run`: **41 test files / 566 tests passing**, in Node (no jsdom; render
-  tests use `react-dom/server`'s `renderToStaticMarkup`, so effects never fire).
+- **SQL verifier green** — `db/verify/tenant_isolation.sql` (tenant isolation): scenarios **1–9** are the
+  Prompt #02 isolation bar (cross-tenant read denial 1, no direct client DML 2, foreign-id refusal at the doors
+  3, outlet-scoped narrowing inside one tenant 4, a persisted context not outliving the access that justified it
+  5, suspension removing authority + revoking grants while the login survives 6, the harness identity override
+  unreachable from a client session 7, the invitation round trip 8, end-to-end write + archive-not-delete 9).
+  This bar was **9 scenarios / 78 `PASS` assertions** at the #02 close; the file has only grown since — see the
+  #03 and Phase 1 sections for the current measured total.
+- **Client suite green** — `npx vitest run`: **41 test files / 566 tests passing** at this stage (51 / 721 now),
+  in Node (no jsdom; render tests use `react-dom/server`'s `renderToStaticMarkup`, so effects never fire).
 - **Typecheck + production build green** — `tsc --noEmit` is clean and `npm run build` succeeds: one JS chunk
-  of **721.15 kB** and **27.05 kB** of CSS. Vite's chunk-size warning on that single bundle is known —
-  route-level lazy code-splitting was deliberately **not** done in this stage.
+  of **721.15 kB** and **27.05 kB** of CSS at this stage (756.42 kB / 27.44 kB now). Vite's chunk-size warning on
+  that single bundle is known — route-level lazy code-splitting was deliberately **not** done in this stage.
 - **§97 checklist + §98 stage report** — `docs/ACCEPTANCE.md` maps every Prompt #02 requirement to the
   artefact that proves it, and names the `BLOCKED` / `NOT_TESTED` / `DEFERRED` ones instead of rounding them up.
 
@@ -54,36 +54,51 @@ Proven, not asserted:
 | Invitation email delivery | **DEFERRED → Prompt #03** — accept door is proven (scenario 8); the link is never emailed |
 | Admin CRUD screens + onboarding wizard + context switcher UI | **IMPLEMENTED** — routes are data (`src/app/routes.ts` `ROUTES`, mapped inside `BrowserRouter` in `src/App.tsx` with a catch-all "not implemented" route; `src/app/navigation.ts` marks the live rows and `src/app/routes.test.ts` diffs the two lists); one screen per route under `src/pages/` (organization / properties / outlets / departments / team / roles / audit + the onboarding wizard); the header `ContextSwitcher` (§27–§30) renders the three-level picker with org-wide / property-wide sentinels and non-ACTIVE rows labelled, `ContextNotices` (store `notices` + `dismissNotice(id)`) surfaces a cleared context, and `AccessDenied`/`CapabilityNote` distinguish five denial causes so only a real `role` refusal names a permission or an administrator. **End-to-end browser data flow is NOT_TESTED** — no PostgREST locally, so the app boots into its honest "no data plane" state (see "Not yet exercised") |
 
-### Prompt #03 — next (finish Phase 0, then start the first module)
+### Prompt #03 — delivered (Phase 0 security substrate)
 
-1. **Real authentication** — GoTrue email/password sign-in, session persistence and refresh, sign-out. A
-   deliberate deferral from #02, not an oversight: a half-wired auth surface is the kind of thing that ships a
-   security hole, so #02 shipped a seeded dev user + `claim_demo_organization()` (guarded so only a person with
-   no organization can take the demo estate) instead.
-2. **Invitation email delivery** — the round-trip logic is done and door-tested; this is the delivery + the
-   accept-from-email flow.
-3. **RBAC + permission hardening** — enforcement completeness review, and the decision on whether
-   DEPARTMENT-scope grants get wired end to end (today `assign_role` refuses them with
-   `NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED` because `my_permissions` resolves organization/property/outlet only).
-   The admin CRUD screens, onboarding wizard and context-switcher UI landed in #02 and gate on real
-   `domain.verb` tokens (drift-checked by `taxonomy.test.ts`); what #03 adds here is only the *authenticated*
-   path — real sign-in driving the same screens against a hosted tenant, replacing the seeded dev user.
-4. **The first operational module** (Phase 1 restaurant) begins only once Phase 0's exit gate is true.
+`008`–`012` plus the client half. Each of the four items #02 deferred arrived, one of them deliberately not in
+the form the prompt asked for (D-32: email-link-only sign-in — no password path was introduced, because §41
+forbade inventing one and GoTrue magic links already satisfy "a real session"):
+
+1. **Real authentication** — `src/db/client.ts` boots GoTrue with `persistSession/autoRefreshToken/
+   detectSessionInUrl: true` (supersedes D-17's `false` flags, D-31); `src/domain/auth/auth-service.ts` signs in
+   with `signInWithOtp` (:79) and signs out through `signOut` (:118), and `010` records both as
+   `sign_in`/`sign_out` session events with `last_login_at` stamped on the profile.
+2. **The account itself is a gate** — `008` makes `profiles.status` refuse a suspended or deactivated person at
+   every door, and a deleted profile fails closed (`NIVAAS_PROFILE_MISSING`); scenario 10 proves it.
+3. **RBAC + permission hardening** — `009` blocks privilege escalation at the doors (a role cannot be granted a
+   permission its grantor does not hold; `ORG_OWNER` cannot be demoted or stripped of its last holder), `011`
+   lets a tenant invent its own role inside those same walls, and `012` closes the invitation lifecycle (one
+   pending invitation per `(organization, email)`, expiry swept lazily, cancel vs revoke distinguished).
+   Scenarios 11–14. DEPARTMENT-scope grants stay **refused, not half-wired** (D-26) — `assign_role` still answers
+   `NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED`, and `my_permissions` resolves organization/property/outlet only.
+4. **`evaluate_access` + `authorize()`** — the non-raising access decision the client pre-flights with (`010`,
+   D-30), mirrored as a pure ladder in `src/domain/access/authorize.ts` and tested against every denial reason,
+   so the UI and the database cannot disagree about *why* someone was refused.
+
+**Proof:** `db/verify` **15 scenarios / 195 `PASS` assertions / 0 failures on a cold rebuild**; client suite
+**51 files / 721 tests**; `npx tsc --noEmit --incremental false` clean; `npm run build` 756.42 kB + 27.44 kB;
+`docs/SECURITY.md`, `docs/PERMISSIONS.md` (54-token catalogue) and the drift gates
+(`permissions.test.ts`, `doors.test.ts`, `door-errors.test.ts`, `taxonomy.test.ts`) green in both directions.
+The §78 checklist and the §81 stage report are `docs/ACCEPTANCE-03.md`.
 
 **Exit gate for Phase 0:** a real person can sign up, create an organization, add two properties with different
 currencies/timezones, add an outlet to each, invite a second user with a different role, and see tenant B
-provably unable to read tenant A's rows at the database level. The tenancy/RBAC/audit half of this gate is
-**proven** (scenarios 1–9); the *sign-up / invite-a-real-person / email-the-link* half is **not yet exercised**
-and is exactly what Prompt #03 supplies.
+provably unable to read tenant A's rows at the database level. The tenancy/RBAC/audit half is **proven**
+(scenarios 1–14); the *sign-up / invite-a-real-person / email-the-link* half is **BLOCKED on owner
+configuration**, not on code — see the next list.
 
 **Not yet exercised (read as pending, not done):**
-- **A hosted apply** — `000`–`007` have only been run against a local 18.3 mirror; a hosted apply needs a real
-  AMRUT NIVAAS Supabase project, which does not exist yet, so it is **BLOCKED**, not merely pending.
-- **End-to-end browser data flow** — PostgREST is not installed in the local harness, so no live click-through
-  has been exercised (**NOT_TESTED**). With no project keys the app boots into its honest "no data plane"
-  state rather than showing placeholder rows.
-- **Live sign-in and invitation email** — GoTrue + email delivery, Prompt #03; this stage's acting user is a
-  seeded dev user (D-17).
+- **A behavioural run against the hosted project.** `000`–`014` (minus the dev-only `007`) are applied to the real
+  AMRUT NIVAAS Supabase project and re-read structurally — 20/20 tenant tables under RLS, 50 doors, zero
+  unprotected tables, anonymous table read refused 401, anonymous door call refused `NIVAAS_NO_SESSION`. The
+  195-assertion scenario file is **deliberately never run hosted** (`db/harness` keeps it local-only).
+- **A delivered sign-in link** — the hosted project has **no SMTP transport** (`smtp_host` null) and `site_url`
+  is still GoTrue's `http://localhost:3000` default, so a magic link can be neither sent nor landed on the app.
+  Owner action, through the Supabase dashboard.
+- **End-to-end browser data flow** — PostgREST is not installed locally, and the hosted stack has not been driven
+  from a browser in this session (**NOT_TESTED**). With no project keys the app boots into its honest
+  "no data plane" state rather than showing placeholder rows.
 - **Cache / state isolation (§57–§59)** — proven in `src/state/tenant-cache.test.ts`, asserted NOT covered by
   the SQL verifier.
 
@@ -95,6 +110,12 @@ and is exactly what Prompt #03 supplies.
 
 Prerequisites: Phase 0 complete (tenancy, RBAC, audit) and **the printing decision resolved** — KOT/KDS is
 where an unresolved print architecture becomes a customer-visible failure.
+
+**In progress (Prompt #04).** `013` seeded the 27 restaurant tokens onto the system roles and proved the
+permission ladder in-SQL; `014` created the six menu tables and their 19 doors, and scenario 15 attacks them.
+Floors/tables, the order state machine, the bill calculation engine, payments and KOT are the remaining #04
+migrations (`015`–`018`), and none of the restaurant UI exists yet — so this phase is substrate, not a usable
+restaurant.
 
 Must-not-skip detail: tax computation on the bill belongs here (a restaurant that cannot issue a
 compliant bill is not sellable in India), even though the accounting engine and GST reports arrive in

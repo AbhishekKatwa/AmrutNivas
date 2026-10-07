@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   addMoney,
   assertNoFloatMoney,
+  calculateChange,
   formatMoney,
   moneyFromPaise,
   moneyFromRupees,
+  multiplyMoneyByQuantity,
+  parseMoneyInput,
+  percentOfMoney,
   splitMoney,
   subMoney,
 } from "./money";
@@ -122,5 +126,106 @@ describe("assertNoFloatMoney", () => {
   it("rejects a float where minor units are required", () => {
     expect(() => assertNoFloatMoney(123.45, "ledger")).toThrow(/float 123.45/);
     expect(() => assertNoFloatMoney("12345", "ledger")).toThrow(/expected minor units/);
+  });
+});
+
+describe("multiplyMoneyByQuantity — a POS line total", () => {
+  it("multiplies exactly, in minor units", () => {
+    expect(multiplyMoneyByQuantity(moneyFromRupees("280.50"), 2).minor).toBe(56100n);
+    expect(multiplyMoneyByQuantity(moneyFromRupees("0.01"), 7).minor).toBe(7n);
+    expect(multiplyMoneyByQuantity(moneyFromRupees("280.50"), 2).currency).toBe("INR");
+  });
+
+  it("refuses every quantity §31 names: zero, negative, fraction, NaN, Infinity", () => {
+    const line = moneyFromRupees("10.00");
+    for (const quantity of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => multiplyMoneyByQuantity(line, quantity), String(quantity)).toThrow(
+        /positive whole count/,
+      );
+    }
+  });
+});
+
+describe("percentOfMoney — the discount percentage", () => {
+  it("is exact when the percentage divides evenly", () => {
+    expect(percentOfMoney(moneyFromRupees("280.50"), "10").minor).toBe(2805n);
+    expect(percentOfMoney(moneyFromRupees("100.00"), "33.33").minor).toBe(3333n);
+    expect(percentOfMoney(moneyFromRupees("780.00"), "0").minor).toBe(0n);
+  });
+
+  it("rounds a paisa tie away from zero, both below and above it", () => {
+    // 100 paise at 2.5% is exactly 2.5 paise: half-up says 3, banker's rounding says 2.
+    expect(percentOfMoney(moneyFromRupees("1.00"), "2.5").minor).toBe(3n);
+    expect(percentOfMoney(moneyFromRupees("0.03"), "50").minor).toBe(2n);
+    // and 0.35 of a paisa is nothing, which is the other half of the same rule.
+    expect(percentOfMoney(moneyFromRupees("1.00"), "0.35").minor).toBe(0n);
+  });
+
+  it("refuses a percent that is not a plain non-negative decimal", () => {
+    const bill = moneyFromRupees("100.00");
+    for (const percent of ["12.345", "abc", "-5", "", "1 0"]) {
+      expect(() => percentOfMoney(bill, percent), percent).toThrow(/at most 2 fraction digits/);
+    }
+  });
+});
+
+describe("calculateChange — what the pay screen shows", () => {
+  it("answers ₹1000 against a ₹780 bill with ₹220 change and nothing short", () => {
+    const { change, short } = calculateChange(
+      moneyFromRupees("1000"),
+      moneyFromRupees("780"),
+    );
+    expect(formatMoney(change)).toBe("₹220.00");
+    expect(short.minor).toBe(0n);
+  });
+
+  it("keeps a shortfall a shortfall instead of a negative change", () => {
+    const { change, short } = calculateChange(moneyFromRupees("500"), moneyFromRupees("780"));
+    expect(change.minor).toBe(0n);
+    expect(formatMoney(short)).toBe("₹280.00");
+  });
+
+  it("settles an exact payment with both figures at zero", () => {
+    const { change, short } = calculateChange(moneyFromRupees("780.55"), moneyFromRupees("780.55"));
+    expect(change.minor).toBe(0n);
+    expect(short.minor).toBe(0n);
+  });
+
+  it("refuses to compare two currencies", () => {
+    expect(() =>
+      calculateChange(moneyFromRupees("100", "USD"), moneyFromRupees("100", "INR")),
+    ).toThrow(/Currency mismatch/);
+  });
+});
+
+describe("parseMoneyInput — a typed amount, refused rather than thrown", () => {
+  it("accepts plain decimal text and ignores surrounding space", () => {
+    expect(parseMoneyInput("780")).toEqual({
+      ok: true,
+      amount: moneyFromRupees("780.00"),
+    });
+    expect(parseMoneyInput("  780.50  ").ok).toBe(true);
+    expect(parseMoneyInput("12.5", "INR")).toEqual({
+      ok: true,
+      amount: moneyFromRupees("12.50"),
+    });
+  });
+
+  it("names the reason for every refusal", () => {
+    expect(parseMoneyInput("")).toEqual({ ok: false, reason: "BLANK" });
+    expect(parseMoneyInput("   ")).toEqual({ ok: false, reason: "BLANK" });
+    expect(parseMoneyInput("-5")).toEqual({ ok: false, reason: "NEGATIVE" });
+    expect(parseMoneyInput("abc")).toEqual({ ok: false, reason: "NOT_A_NUMBER" });
+    expect(parseMoneyInput(".")).toEqual({ ok: false, reason: "NOT_A_NUMBER" });
+    expect(parseMoneyInput("12.3.4")).toEqual({ ok: false, reason: "NOT_A_NUMBER" });
+    // Grouped text is refused, never silently stripped: accepting "1,234.56" means
+    // deciding what "1,2,3" is, and no answer there is a good one.
+    expect(parseMoneyInput("1,234.56")).toEqual({ ok: false, reason: "NOT_A_NUMBER" });
+    expect(parseMoneyInput("10.005")).toEqual({ ok: false, reason: "TOO_PRECISE" });
+  });
+
+  it("asks the currency how many fraction digits it has", () => {
+    expect(parseMoneyInput("1000", "JPY")).toEqual({ ok: true, amount: moneyFromRupees("1000", "JPY") });
+    expect(parseMoneyInput("1000.5", "JPY")).toEqual({ ok: false, reason: "TOO_PRECISE" });
   });
 });

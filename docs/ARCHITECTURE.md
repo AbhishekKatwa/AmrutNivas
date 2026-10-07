@@ -2,12 +2,17 @@
 
 **Positioning:** The Operating System for Hospitality — a multi-tenant, multi-property, multi-outlet,
 multi-role, multi-language, multi-currency, AI-ready hospitality SaaS.
-**Status of this document:** Prompt #01 direction, corrected against what Prompt #02 actually built.
-The tenancy data plane and the tenant architecture are **IMPLEMENTED and executed** —
-`db/supabase/000`–`007` applied against a real PostgreSQL 18.3 and attacked by `db/verify/tenant_isolation.sql`
-(9 scenarios, 78 assertions), with the client mirror in `src/db`, `src/domain` and `src/state` and the built
-shell/screens in `src/app` and `src/pages`. Anything
-marked **not yet exercised** has no proof behind it yet and must not be read as done — see the closing list.
+**Status of this document:** Prompt #01 direction, corrected against what Prompt #02, #03 and the first
+half of #04 actually built. The tenancy data plane, the tenant architecture and the authentication/RBAC/audit
+hardening are **IMPLEMENTED and executed** — `db/supabase/000`–`014` applied twice over: against a real
+PostgreSQL 18.3 in `db/harness/` (and attacked by `db/verify/tenant_isolation.sql`: **15 scenarios, 195 `PASS`
+assertions, 0 failures**) and against the hosted AMRUT NIVAAS Supabase project (`000`–`014` minus the dev-only
+`007`; 20/20 tenant tables under RLS, 50 `SECURITY DEFINER` doors, no unprotected table). The client mirror
+lives in `src/db`, `src/domain` and `src/state`, the built shell/screens in `src/app` and `src/pages`, and the
+suite is **51 files / 721 tests**. `013`/`014` are Prompt #04's substrate — the restaurant permission ladder and
+the menu domain — and are described here because they are schema facts, not because the module is finished.
+Anything marked **not yet exercised** has no proof behind it yet and must not be read as done — see the closing
+list.
 
 ---
 
@@ -109,8 +114,9 @@ user_active_contexts) and the RLS + access-resolution helpers in `003_rls.sql` /
 
 - **Authentication identity stays separate from business roles.** The auth provider answers "who is this
   session" (`auth.uid()`, mirrored into `public.profiles`); the membership table answers "what may they do
-  where". Nothing encodes a role in the login. **The provider itself is not wired yet** — see §13; until
-  Prompt #03 there is no real sign-in.
+  where". Nothing encodes a role in the login. Prompt #03 wired the provider: sign-in is a GoTrue **email link
+  only**, never a password (`src/domain/auth/auth-service.ts`, D-32), and the account-status gate in `008`
+  makes the login itself a first-class access decision. See `docs/SECURITY.md` §2/§9.
 - **A role grant is `(role, permission, scope_level, scope_id)`** resolved to the *widest applicable grant*,
   and breadth (which properties/outlets, via `membership_property_access` / `membership_outlet_access` with
   `ALL_PROPERTIES`/`SELECTED_PROPERTIES` and `ALL_OUTLETS`/`SELECTED_OUTLETS`) is kept separate from
@@ -121,10 +127,12 @@ user_active_contexts) and the RLS + access-resolution helpers in `003_rls.sql` /
   role can be *seeded* — but `assign_role` refuses to grant one with `NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED`,
   because `my_permissions` resolves organization/property/outlet grants only. Accepting a department id would
   write a grant that silently confers nothing. This is deliberate: a half-wired capability is worse than an
-  absent one. Prompt #03 decides whether to resolve department scoping end to end.
-- **Permissions are strings of shape `domain.verb`** — the seed (`006_seed_rbac.sql`) ships 13 system roles
-  and 25 permissions, and `taxonomy.test.ts` checks each seeded verb matches `PERMISSION_PATTERN` and that
-  every verb the admin screens gate on is present.
+  absent one. **Prompt #03 kept the refusal** (D-26) — it hardened the four resolvable scopes and left
+  DEPARTMENT as un-grantable data; resolving it is a named future phase, not a silent half-wire.
+- **Permissions are strings of shape `domain.verb`** — `006_seed_rbac.sql` ships 13 system roles and 25
+  permissions, `011_custom_roles.sql` adds `role.create`/`role.edit` for a total of **27** keys across 8
+  domains, and `taxonomy.test.ts` checks each seeded verb matches `PERMISSION_PATTERN` and that every verb
+  the admin screens gate on is present. `docs/PERMISSIONS.md` is the admin-readable catalogue.
 - **One source of truth, enforced by diffing rather than by promise** (this replaced the donor's "matrix
   lives twice and drifts" bug): `src/db/doors.ts`, `src/db/door-errors.ts` and every client status/taxonomy
   list in `src/domain/identity/types.ts` are each compared **against the SQL itself, in both directions** by
@@ -277,8 +285,11 @@ new AppError(code, message)       →  toPublicError() maps code → status via 
 - `toPublicError` is a **one-way filter**: it never copies a foreign `message`, stack, SQLSTATE, driver string
   or file path. Stack traces, SQL text, connection strings and secrets never reach a user.
 - Structured logs answer: what / when / where / which organization / which property / which user / which
-  request; request-correlation id spans client → API → DB. **Log plumbing is not yet built** — the shape is
-  defined, the writer is Prompt #03+. No PII or token material in logs.
+  request; request-correlation id spans client → API → DB. Prompt #03 built the **durable security trail** —
+  `app.audit` writes outcomes (SUCCESS/FAILURE/DENIED) and `public.record_auth_event` writes sign-in/sign-out,
+  with the §68 rule that no secret or credential material is ever stored in a row (`docs/SECURITY.md` §8). A
+  general runtime **application logger** (stdout/OTEL correlation ids) is still not built; its shape is defined
+  and it is a later phase. No PII or token material in logs.
 
 ---
 
@@ -289,13 +300,13 @@ This is the spine Prompt #02 actually built. One call, end to end:
 ```text
 env gate          src/config/env.ts        only VITE_* is read, shape-checked (hosted url / local url / JWT-ish key);
                                              a half-configured build resolves "unconfigured", never crashes at import
-memoized client   src/db/client.ts         createClient(..., auth:{persistSession:false, autoRefreshToken:false,
-                                             detectSessionInUrl:false}); one instance; returns null when unconfigured
+memoized client   src/db/client.ts         createClient(..., auth:{persistSession:true, autoRefreshToken:true,
+                                             detectSessionInUrl:true}); one instance; returns null when unconfigured
 two funnels only  src/db/rpc.ts            callDoor / callDoorRow  = every write + the resolved reads the DB owns
                                              rows / camelRows / firstCamelRow = a plain SELECT under RLS, read-only by type
 one case map      src/db/case.ts           toCamelCase at the TOP LEVEL only (JSON columns keep their own keys);
                                              toDoorArgs: expectedVersion → p_expected_version, p_ stripped on the way back
-the door          public.<fn> (005/007)    SECURITY DEFINER, set search_path = '', re-proves membership+permission,
+the door          public.<fn> (005,007,010,011) SECURITY DEFINER, set search_path = '', re-proves membership+permission,
                                              acts, calls app.audit(), returns the written row as jsonb
 the backstop      RLS (003)                even if a door were bypassed, authenticated holds SELECT only and every
                                              tenant table has a scope policy — the client is convenience, the DB is truth
@@ -311,13 +322,17 @@ purpose: a second read can race a concurrent change and then the UI would displa
 
 Supabase's PostgREST serves functions in **`public`** and nothing else. So the split is load-bearing:
 
-- **`public`** holds only the **25 client-facing doors** — the whole write API of the product, named in one
+- **`public`** holds only the **50 client-facing doors** — the whole write API of the product, named in one
   place in `src/db/doors.ts`: 12 hierarchy (`create/update/set_*_status` × organization/property/outlet/
   department), 9 people/access (`invite_member`, `accept_invitation`, `cancel_invitation`, `set_member_status`,
-  `transfer_ownership`, `assign_role`, `revoke_role`, `set_property_access`, `set_outlet_access`), 3 session/
-  permission (`set_active_context`, `resolve_active_context`, `my_permissions`), 1 dev-only
+  `transfer_ownership`, `assign_role`, `revoke_role`, `set_property_access`, `set_outlet_access`), 4 custom-role
+  doors from `011` (`create_role`, `update_role`, `set_role_permissions`, `set_role_status`), 3 session/
+  permission (`set_active_context`, `resolve_active_context`, `my_permissions`), 2 security-decision doors from
+  `010` (`evaluate_access`, `record_auth_event`), 19 menu doors from `014` (`create_menu` … `menu_snapshot`,
+  `menu_item_current_price` — the last two are reads that go through a door because a bill line must be priced
+  from the snapshot the kitchen served, not from whatever the price row is today), and 1 dev-only
   (`claim_demo_organization`, from `007`). 24 are defined in `005_write_rpc.sql`; `claim_demo_organization` is
-  the 25th, in `007`.
+  the 25th (in `007`); `010`/`011` add 6 more and `014` the final 19.
 - **`app`** holds every guard and helper — access resolution, validation, `audit()`, `blankable()`, version
   checks, chain assertions — and is **unreachable from a browser regardless of grants**, because PostgREST
   does not expose it. A bug that leaks an `app.*` name cannot be exploited over HTTP; the surface is closed by
@@ -408,8 +423,9 @@ src/
   lib/            errors.ts, audit.ts   test-helpers/ (SQL parser + Node stub transport)   types/
 ```
 
-Feature modules (`modules/{restaurant,hotel,inventory,finance,…}`) are the target for Prompt #03+; they do
-not exist yet because no operational module has been built. The frontend keeps `domain/` pure and
+Feature modules (`modules/{restaurant,hotel,inventory,finance,…}`) are the target from Prompt #04 onward; they
+do not exist yet because no operational module has been built (Prompt #03 hardened the security substrate, not
+the modules). The frontend keeps `domain/` pure and
 network-free so business rules unit-test in Node without rendering (a lesson from the donor's test attempts,
 which it never had).
 
@@ -487,43 +503,58 @@ never points at no route and an unroutable screen never ships as dead code in th
 
 ## 15. Testing foundation
 
-**IMPLEMENTED:** two proof layers, plus a green typecheck and production build — all as of Prompt #02.
+**IMPLEMENTED:** two proof layers, plus a green typecheck and production build — as of Prompt #02, extended by
+Prompt #03's security substrate.
 
-- **Client suite** — `npx vitest run`: **41 test files / 566 tests, all passing**, run in Node (no jsdom; the
-  render tests use `react-dom/server`'s `renderToStaticMarkup`, so effects never fire). It covers money
-  exactness, error sanitisation, the identity/permission type contract, the context store and tenant-cache
+- **Client suite** — `npx vitest run`, run in Node (no jsdom; the render tests use `react-dom/server`'s
+  `renderToStaticMarkup`, so effects never fire). It covers money exactness, error sanitisation, the
+  identity/permission type contract, the context store and tenant-cache
   isolation, the §30 address-bar context sync, the route↔navigation registry, the access-denied reason model,
   every scoped service and the built hierarchy/people/roles/audit/onboarding screens, the shared UI primitives,
   and the drift tests of §13.5 — including the client permission-token scrape that fails the suite on a
-  capability the seed never granted. The stub transport (`src/test-helpers/transport.ts`) replaces the client
+  capability the seed never granted. Prompt #03 added the pure client access mirror `authorize.test.ts`, the
+  email-link-only `auth-service.test.ts` (asserts the wire never carries `signInWithPassword`) and extended
+  `permissions.test.ts`, `door-errors.test.ts` and `doors.test.ts` to the new keys, tokens and doors. The stub
+  transport (`src/test-helpers/transport.ts`) replaces the client
   under the RPC funnel and asserts what reached the wire, and `doorParametersMatchTheSchema` checks those
   parameters against the migration signatures — so "the test passes" also means "PostgREST would accept the
-  call".
-- **SQL verifier** — `db/verify/tenant_isolation.sql` ("Prompt #02 §80/§81 verification: tenant isolation"):
-  **9 scenarios / 78 `PASS` assertions, 0 failures**, re-run cold today (**2026-10-07**) from a rebuilt
-  cluster against **PostgreSQL 18.3** via `db/harness/local-pg.sh rebuild`. It exercises the isolation bar
-  under the `authenticated` role only (writes are seeded as superuser because migration-time seeds have no
+  call". The measured total after Prompt #03 and `014` is **51 test files / 721 tests, all passing** (the Prompt
+  #02 snapshot was 41 files / 566 tests).
+- **SQL verifier** — `db/verify/tenant_isolation.sql` (tenant isolation + Prompt #03 hardening + the #04
+  permission ladder and menu domain): **15 scenarios / 195 `PASS` assertions, 0 failures on a cold rebuild**.
+  Scenarios 1–9 are the Prompt #02 isolation bar; 10–14 are the Prompt #03 proofs (10 = the account gate `008`,
+  11 = privilege escalation `009`, 12 = outcomes in the trail `010`, 13 = a custom tenant role `011`,
+  14 = the invitation lifecycle `012`); 15 is Prompt #04's — the restaurant permission ladder, the cross-tenant
+  menu door refusal and the exact-decimal money constraints on `menu_item_prices`. It exercises the isolation
+  bar under the `authenticated` role only (writes are seeded as superuser because migration-time seeds have no
   session), and asserts both directions: the valid case is accepted *and* the invalid case is refused with a
   specific `NIVAAS_*` token.
-- **Typecheck + production build** — `tsc --noEmit` is clean and `npm run build` succeeds, emitting one JS
-  chunk of **721.15 kB** and **27.05 kB** of CSS. Vite's chunk-size warning fires on that single bundle;
-  route-level lazy code-splitting was **deliberately not done in this stage** — the tree is small and one
-  honest number is easier to revisit when operational modules land than a premature split.
+- **Typecheck + production build** — `npx tsc --noEmit --incremental false` is clean and `npm run build`
+  succeeds, emitting one JS chunk of **756.42 kB** and **27.44 kB** of CSS. Vite's chunk-size warning fires on
+  that single bundle; route-level lazy code-splitting was **deliberately not done in this stage** — one honest
+  number is easier to revisit when the operational modules land than a premature split.
 
 A green typecheck is not a gate on financial correctness. Future layers (integration beyond the door, API
 contract, E2E for money- and stock-critical workflows) arrive with those modules.
 
 **Not yet exercised (no proof behind these yet, do not read as done):**
-- A **hosted apply** — the migrations have been run against a local 18.3 mirror, not yet a real AMRUT NIVAAS
-  Supabase project, which does not exist yet; a hosted apply is therefore **BLOCKED**, not merely undone.
-- **End-to-end browser data flow** — PostgREST is not installed in the local harness, so no live click-through
-  has been exercised against a real data plane (**NOT_TESTED**). Without project keys, the app boots into its
-  honest `unconfigured` state — the shell header reads "No data plane" (`ContextSwitcher.triggerLabel`), and
-  any gated screen falls back to the `no-data-plane` AccessDenied wording rather than inventing a denial.
-- **Real sign-in, token verification, session refresh and the email delivery behind an invitation** —
-  `detectSessionInUrl: false` and `persistSession: false` mean there is no live auth path; GoTrue + email
-  land in Prompt #03. Invitation *accept* door logic is proven with a seeded identity in scenario 8; delivering
-  the link is not. The acting user in this stage is the seeded dev user from `007`.
+- **`db/verify` has never run against the hosted project.** The hosted apply *has* happened — `000`–`014` on the
+  AMRUT NIVAAS Supabase project, then re-read as 20/20 RLS tables, 50 doors and zero unprotected tables, with an
+  anonymous read of `menus` refused (401) and an anonymous `create_menu` refused by the door itself
+  (`NIVAAS_NO_SESSION`). What is NOT done is the 195-assertion scenario file against it: the harness deliberately
+  refuses to run `db/verify` hosted, so the hosted posture is verified structurally, not behaviourally.
+- **End-to-end browser data flow** — PostgREST is not installed in the local harness, and the hosted project has
+  not been driven from a browser in this session (**NOT_TESTED**). Without project keys the app boots into its
+  honest `unconfigured` state — the shell header reads "No data plane" (`ContextSwitcher.triggerLabel`), and any
+  gated screen falls back to the `no-data-plane` AccessDenied wording rather than inventing a denial.
+- **A real emailed sign-in link and delivered invitation** — the auth *code* exists: `src/db/client.ts:56`
+  runs `persistSession/autoRefreshToken/detectSessionInUrl: true`, `auth-service.ts` signs in with
+  `signInWithOtp` (email link only, D-32), `010` records `sign_in`/`sign_out` and stamps `last_login_at`, and the
+  session-sync/`bootstrap` path is unit-tested. The remaining blocker is configuration, not code: the hosted
+  project has **no SMTP transport** (`smtp_host` null) and `site_url` still defaults to `http://localhost:3000`,
+  so a magic link could neither be sent nor land on the app. Invitation *accept* door logic is proven in the
+  verifier (scenarios 8 and 14); the delivery hop is the unproven link. The acting user in the local harness
+  remains the seeded dev user from `007`.
 - **§57–§59 cache/state isolation is TypeScript-only** — proven in `src/state/tenant-cache.test.ts`, asserted
   as NOT covered by the SQL verifier.
 

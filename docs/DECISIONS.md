@@ -64,13 +64,15 @@ accounting/GST/HRMS/CRM/events/AI/subscription code. Domain entities exist as ty
 navigation exposes unavailable items as disabled "Not implemented" rows.
 **Reason:** Prompt #01 §IMPORTANT and §35 forbid building the product or creating placeholder pages in
 this task.
-**Superseded in part (Prompt #02, extended by #03):** the "no backend wiring / typed contracts only" half
-of this decision no longer describes the tree. D-16–D-18 wired the data plane and `db/supabase/000`–`012` are
-**executed** against a local PostgreSQL 18.3 mirror, the Phase 0 admin screens render over those real tables
-(see ROADMAP Phase 0), and Prompt #03 built the authentication/RBAC/audit layer this decision used to defer
-(D-29–D-40; see `docs/SECURITY.md`, `docs/PERMISSIONS.md`). What still stands is the *product* scope of the
-deferral: no operational-module screens — POS/PMS/KDS/inventory/accounting/GST/HRMS/CRM/events/AI/subscription
-are still honest disabled "Not implemented" nav rows (the restaurant loop arrives with Prompt #04).
+**Superseded in part (Prompt #02, extended by #03 and #04's substrate):** the "no backend wiring / typed
+contracts only" half of this decision no longer describes the tree. D-16–D-18 wired the data plane and
+`db/supabase/000`–`014` are **executed** — against the local PostgreSQL 18.3 mirror and against the hosted
+AMRUT NIVAAS Supabase project (O-7 is closed; `007` stays off it), the Phase 0 admin screens render over those
+real tables (see ROADMAP Phase 0), and Prompt #03 built the authentication/RBAC/audit layer this decision used
+to defer (D-29–D-40; see `docs/SECURITY.md`, `docs/PERMISSIONS.md`). What still stands is the *product* scope of
+the deferral: no operational-module screens — POS/PMS/KDS/inventory/accounting/GST/HRMS/CRM/events/AI/subscription
+are still honest disabled "Not implemented" nav rows. `013`/`014` put the restaurant *permissions and menu
+schema* in place, which is substrate; the restaurant loop itself arrives with the rest of Prompt #04.
 
 ## D-07 · Tax computation on the document belongs in Phase 1; the accounting engine stays in Phase 4
 **Date:** 2026-10-07 · **Status:** PROPOSED (needs owner sign-off; see ROADMAP §5)
@@ -245,8 +247,9 @@ lets someone re-join a tenant they were removed from.
 sweep (`app.expire_stale_invitations`, run inside `invite_member`, not audited because time is not a person),
 and `cancel_invitation` recording `member_invitation_cancelled` for the inviter versus `member_invitation_revoked`
 for anyone else. The accept *door* is proven in the verifier (scenario 14). What is still **blocked** is
-*delivery*: the link is returned to the caller, but no message reaches a real inbox until the owner provisions a
-hosted Supabase project with an email provider — see `docs/ACCEPTANCE.md` (hosted apply / real email).
+*delivery*: the link is returned to the caller, but no message reaches a real inbox until the hosted project gets
+an SMTP transport and a real `site_url` (O-8 — the project itself now exists and carries `000`–`014`; see
+`docs/ACCEPTANCE-03.md`).
 
 ## D-24 · Suspension revokes grants; reinstatement does NOT restore them
 **Date:** 2026-10-07 · **Status:** ACCEPTED
@@ -313,6 +316,191 @@ a read through `rows()`.
 
 ---
 
+## Prompt #03 decisions — authentication, RBAC, permission and audit hardening
+
+These record what Prompt #03 actually built, including where it deliberately diverged from the prompt. Each
+divergence is authorized by the prompt's own recurring rule ("use the repository's existing convention if one
+exists") and each carries the trade-off that was accepted. Full behavior is in `docs/SECURITY.md` and
+`docs/PERMISSIONS.md`.
+
+## D-29 · A tenant can never be left without an operable owner
+**Date:** 2026-10-07 · **Status:** ACCEPTED (Prompt #03 §30)
+
+**Decision:** ownership is protected by refusals at the doors, not by a convention. `set_member_status` refuses
+to move an `is_owner` membership to *either* retired status with `NIVAAS_OWNER_MUST_TRANSFER` (`009:331-333`);
+`revoke_role` refuses to strip the owner's owner-class grant the same way (`009:273-278`); both paths refuse a
+non-owner, non-platform actor with `NIVAAS_OWNER_ONLY` (`009:336-342`); and `set_member_status` refuses
+self-retirement with `NIVAAS_SELF_NOT_ALLOWED` while `assign_role` refuses self-grant with
+`NIVAAS_SELF_ASSIGN_DENIED` (`009:327`, `009:139`). The owner seat itself moves only through
+`public.transfer_ownership`, which flips `is_owner` on and off in one transaction (`005:1198`, `005:1229-1233`).
+**Reason:** an estate without an accountable owner is unmanageable and unrecoverable — no one can grant, no one
+can transfer, and support has no authority to hand back. Losing the last owner through a UI slip is worse than
+forcing one deliberate action (a transfer).
+**Consequence:** the "leave" path for an owner is always a two-step transfer-then-exit; a single careless
+suspend/remove cannot orphan a tenant. Verifier scenario 11 exercises the escalation refusals this pairs with.
+
+## D-30 · `evaluate_access` is the denial recorder, because a raising door cannot audit its own refusal
+**Date:** 2026-10-07 · **Status:** ACCEPTED (Prompt #03 §34/§82)
+
+**Decision:** the `DENIED` outcome in the trail comes from `public.evaluate_access` (`010`), a non-raising
+access-decision door whose whole purpose is to answer "may this actor do this?" and, when the answer is no,
+write an `access_denied` row via `app.audit_access`. Raising doors (`app.require_permission`) still return the
+`NIVAAS_ACCESS_DENIED` token to the caller but do **not** self-log the denial.
+**Reason:** a refusal is delivered with `raise exception`, which aborts the door's own transaction — including
+the audit insert it just made. Postgres has no autonomous transaction, and the only ways to fake one (dblink, a
+queue, a background worker) are exactly the §60 machinery this product forbids. So the state is said plainly
+rather than papered over: the *decision* that a denial is recorded is made by the non-raising path, and a denial
+a person actually sees on a guard or confirmation screen is a denial that went through `evaluate_access`.
+**Consequence:** `evaluate_access` records stranger/no-session/profile-missing denials with `organization_id =
+NULL` and keeps the probed id only in `metadata` (`010:208-222`), so probing foreign tenants cannot graft rows
+onto a victim's history. The §40/`app.require_tenant_visibility` rule that a foreign id answers `NOT_FOUND`
+(not 403) is what stops the raise-path from leaking existence at all. Verifier scenario 12 proves outcomes land
+in the trail.
+
+## D-31 · Real session persistence — supersedes D-17's `false` flags
+**Date:** 2026-10-07 · **Status:** ACCEPTED (supersedes D-17)
+
+**Decision:** `src/db/client.ts:56` now runs `auth: { persistSession: true, autoRefreshToken: true,
+detectSessionInUrl: true }`. GoTrue owns its own storage; the app adds nothing to `localStorage` itself, so
+D-27 (in-memory context store and tenant cache) still stands unchanged.
+**Reason:** a reload must restore the session, a long shift must not end mid-form, and the emailed link must be
+consumed when the URL carries one. The Prompt #02 `false` flags existed only because there was nothing to
+persist; there is now.
+**Consequence:** the store's `bootstrap` re-derives context from the live session on every load (never a saved
+context), `startSessionSync` keeps the tenancy cache honest per auth event, and logout is server-side first
+(the `sign_out` audit is dispatched while a JWT still authenticates the door) then local. D-17 is marked
+superseded rather than deleted so the reason the flags were ever `false` stays readable.
+
+## D-32 · Email-link-only sign-in; no password path introduced
+**Date:** 2026-10-07 · **Status:** ACCEPTED (Prompt #03 §41)
+
+**Decision:** the only credential flow is a GoTrue emailed sign-in link. `auth-service.ts:79` calls
+`signInWithOtp` and nothing else; `auth-service.test.ts:188` asserts the wire never carries
+`signInWithPassword`, and there is no `signUp`/`updatePassword` door.
+**Reason:** the prompt's §41 says "DO NOT introduce password authentication merely because this prompt mentions
+it", and the architecture it inherited has no password store to secure. A one-time emailed link reuses the same
+hashed-token machinery the invitation flow already proved (D-23) and keeps password hashing/reset policy entirely
+inside GoTrue.
+**Consequence:** there is no password to leak, reset, or brute-force in this product's own schema; rate-limiting
+of the *email send* is GoTrue's surface, and the client maps a 429 from `sendSignInLink` to `RATE_LIMITED`
+(D-38 notes why we do not log the request's IP ourselves). MFA/step-up remain a named readiness item, not built.
+
+## D-33 · Two-part `domain.verb` permission keys kept over the prompt's resource/action split
+**Date:** 2026-10-07 · **Status:** ACCEPTED (divergence from §12, authorized by §12)
+
+**Decision:** the catalogue stays on the shipped `domain.verb` strings enforced by the `002` CHECK and mirrored
+in `permissions.ts` (27 keys across 8 domains). The prompt's §12 "PERMISSION OBJECT" conceptually splits a key
+into `domain / resource / action / description`; the implementation folds resource and action into the single
+verb segment (`outlet.discount` not `outlet.bill.discount`) and keeps `domain` + `description` on each entry.
+**Reason:** §12 itself closes with "use the repository's existing architecture if one already exists", and one
+already did — a `domain.verb` column CHECK, a seeded matrix, and drift tests all built on it. Renaming to a
+three-part scheme would migrate a live permission grammar for a modelling nicety with no enforcement benefit.
+**Consequence:** a permission key is exactly one string in exactly one place (`permissions.ts`), diffed against
+SQL by `permissions.test.ts`. Restaurant keys (`restaurant.kot.*`) arrive with Prompt #04 on the same pattern.
+Trade-off accepted: the object model is flatter than §12's four-field form; resource-level filtering is a future
+addition, not a rename.
+
+## D-34 · The database is authoritative; the client account vocabulary lags it
+**Date:** 2026-10-07 · **Status:** ACCEPTED (known gap, recorded honestly)
+
+**Decision:** `008` made the account-status vocabulary `ACTIVE · SUSPENDED · DEACTIVATED` (retiring `INACTIVE`),
+added `first_name`/`last_name`/`locale`/`timezone`/`last_login_at` and a generated-stored `display_name`. The
+domain mirror `src/domain/access/authorize.ts:25` (`AccountStanding`) was updated to match, but
+`src/domain/identity/types.ts` still declares the retired `AccountStatus = "ACTIVE"|"INACTIVE"|"SUSPENDED"`
+(line 49, mirrored at line 147) and its `UserAccount` (lines 273-283) lacks the new profile columns.
+**Reason:** Prompt #03's mandate is the data-plane and the enforcement path; a broad type-layer rename across
+every consumer is the route-guard agent's surface (it is editing `src/app/**`/`src/components/**` concurrently),
+not this one's, and touching it here would collide.
+**Consequence:** enforcement is correct because it lives in SQL and in `authorize.ts`; the `types.ts` lag is a
+documentation-and-follow-up defect, NOT_VERIFIED in `docs/ACCEPTANCE.md`, and the fix is to reconcile that file
+to the DB once the concurrent route work lands. The DB, not the lagging type, is the source of truth.
+
+## D-35 · Lower-case audit verbs kept over the prompt's upper-case event names
+**Date:** 2026-10-07 · **Status:** ACCEPTED (divergence from §33, authorized by §33)
+
+**Decision:** `audit_log.action` and `.entity` are lower_snake, enforced by the `004` CHECK
+`^[a-z][a-z0-9_]{2,63}$` — `member_invited`, `role_assigned`, `auth_sign_in`, `access_denied`. The prompt's §33
+lists them as `USER_INVITED`, `ROLE_ASSIGNED`, `ACCESS_DENIED`.
+**Reason:** §33 itself says "use the repository's existing convention if one exists", and a case-constrained
+column already did. Keeping one case avoids a CHECK migration and an index rebuild on the product's write-hottest
+table for a cosmetic rename.
+**Consequence:** a reader comparing the prompt's event list to the trail must translate case; `docs/SECURITY.md`
+§8 and §11 do that reconciliation (e.g. `ACCESS_DENIED ⇔ access_denied`) so no mapping is implied-but-absent.
+
+## D-36 · `INVITED` stays a membership status, not an account status
+**Date:** 2026-10-07 · **Status:** ACCEPTED (divergence from §4)
+
+**Decision:** the prompt's User object lists account statuses as `ACTIVE · INVITED · SUSPENDED · DEACTIVATED`;
+the shipped `profiles.status` CHECK is `ACTIVE · SUSPENDED · DEACTIVATED` only (`008:86-88`). "Invited" lives
+where it belongs — `organization_memberships.status` (`INVITED · ACTIVE · SUSPENDED · REMOVED`, `002:65`) and
+`invitations.status`.
+**Reason:** a single account can be INVITED into tenant A while ACTIVE in tenant B; putting `INVITED` on the
+profile would claim a whole person is "just an invite" based on one tenant's state, which is exactly the
+organization-specific leakage §5/§4 warn against (`user.role = OWNER` is rejected for the same reason).
+**Consequence:** account status is a platform-level standing; per-tenant standing is the membership row. The
+client mirror keeps both vocabularies distinct (`authorize.ts` standing vs membership status).
+
+## D-37 · `profiles.status` is a platform kill switch with no tenant door
+**Date:** 2026-10-07 · **Status:** ACCEPTED
+
+**Decision:** nothing a tenant can call changes `profiles.status`. The only writes to it are `008`'s one-time
+`INACTIVE→DEACTIVATED` backfill (`008:79`) and the `last_login_at` stamp in `010` — there is no
+`set_profile_status` door. Suspending a person *within a tenant* goes through `set_member_status`, which moves
+the membership, not the account. `app.require_session` reads `app.account_is_operational` and refuses a
+non-operational account with `NIVAAS_ACCOUNT_*`.
+**Reason:** deactivating a login across the entire platform is not a tenant's authority — a tenant that could
+switch off a person's account could disable them everywhere, including in other tenants. Keeping the account
+switch platform-only and the membership switch tenant-scoped preserves that boundary by construction.
+**Consequence:** a tenant can remove someone from *its* estate but cannot strand that human's login; only a
+platform operator (out of band, against the table) flips the account kill switch, and that path is intentionally
+not exposed over PostgREST.
+
+## D-38 · No IP / user-agent columns on audit rows
+**Date:** 2026-10-07 · **Status:** ACCEPTED (divergence from the §48 forensic ideal)
+
+**Decision:** `audit_log` records actor, tenant/property/outlet scope, action, entity, before/after, reason and
+metadata — but no request IP or user-agent. A grep of `db/supabase` and `src/db` finds no `ip_address`/
+`user_agent`/`inet` anywhere.
+**Reason:** the trail is written by Postgres functions reached over PostgREST, which do not reliably expose the
+originating client's socket; a value the *client* supplies (header or arg) is forgeable, and a column that can be
+lied about is worse than none — it invites false-confidence forensics in a security document.
+**Consequence:** IP/UA capture is a genuine gap for incident forensics and is listed as such, not papered over.
+The correct future layer is the platform edge (reverse proxy / GoTrue logs), where the real socket is known and
+un-spoofable by the caller. Trade-off accepted: today's trail proves *who did what to which tenant*, not *from
+what address*.
+
+## D-39 · `ORG_OWNER` is a grantable role; the owner *seat* moves only by transfer
+**Date:** 2026-10-07 · **Status:** ACCEPTED
+
+**Decision:** two different things share the word "owner" and are kept separate. The `ORG_OWNER` *role* is
+grantable through `assign_role` — but only by someone who already holds the seat, because `assign_role` treats an
+`owner_class` role grant as owner-only (`009:151-156`, else `NIVAAS_OWNER_ONLY`). The *ownership seat* is the
+`organization_memberships.is_owner` boolean, and it changes only via `transfer_ownership` (`005:1229-1233`),
+never via a role grant.
+**Reason:** "who can act with owner authority" and "who is accountable for the tenant" are different questions.
+An owner may legitimately empower a co-admin with the ORG_OWNER role without abdicating accountability; the
+single seat must move by one explicit, reason-bearing act so there is never ambiguity about who owns the estate.
+**Consequence:** a custom tenant role can never reach owner authority at all — `011` pins `owner_class = false`
+and `seniority = grant_ceiling (> 0)` on every created role, and a self-check aborts the apply if any tenant row
+ends up `owner_class`/`is_system`/`seniority > 100` (`011:377-384`), so a tenant cannot mint an owner.
+
+## D-40 · Tenant role names are per-tenant and never collide with a system name
+**Date:** 2026-10-07 · **Status:** ACCEPTED (fixes the 002 global-unique constraint)
+
+**Decision:** `011` drops `002`'s global `roles_name_key` unique constraint and replaces it with two partial
+unique indexes: `roles_system_name_idx` on `(name)` where `organization_id is null`, and `roles_tenant_name_idx`
+on `(organization_id, name)` where `organization_id is not null`.
+**Reason:** a global uniqueness rule meant the first tenant to create a role named `SUPERVISOR` blocked every
+other tenant from using that ordinary word — a cross-tenant naming denial that leaks which names exist elsewhere
+and makes custom roles near-unusable. Splitting the namespace gives each tenant its own naming space while keeping
+the platform's system role names in a single, protected namespace so `app.has_permission`'s system-role lookups
+stay unambiguous.
+**Consequence:** two tenants can each define `SUPERVISOR`; neither can shadow a system role name, and a tenant
+role name is only ever resolved within its own `organization_id`. Verifier scenario 13 exercises custom-role
+creation and its ceiling/subset guards.
+
+---
+
 ## Open decisions (blocking)
 
 | # | Decision | Blocks | Notes |
@@ -320,7 +508,8 @@ a read through `rows()`.
 | O-1 | **Thermal printing path** — counter-side local print bridge vs browser-print/PDF for V1 | Phase 1 POS/KDS | A browser cannot open a raw TCP socket to an ESC/POS printer. Architecture choice, not a detail. Still OPEN |
 | ~~O-2~~ | ~~Data plane hosting~~ | — | **RESOLVED** → D-16 (Supabase). Control-plane co-location still deferred to Phase 9 |
 | O-3 | **Environment plan** — development / staging / production, and per-customer demo isolation | First external pilot / any hosted apply | Donor deploys production from a feature branch; that habit must not carry over. Still OPEN |
-| O-4 | **Repo spelling** `amrut-nivas` vs `amrut-nivaas` | Cosmetic, cheap now, expensive after first commits | Product name is definitively AMRUT NIVAAS; package name is `amrut-nivas`. Still OPEN |
+| O-4 | **Repo spelling** `amrut-nivas` vs `amrut-nivaas` | Cosmetic, cheap now, expensive after first commits | Product name is definitively AMRUT NIVAAS; package name is `amrut-nivas`. The checkout is now a git repository with its own history, so the directory name is the last cheap moment to change it. Still OPEN |
 | O-5 | **Design property** — is B.S.P Comfort the Phase 1 pilot, and who owns its real menu, stock list and tax profile data | Phase 1 exit gate | Cannot validate a restaurant loop on invented data. Still OPEN |
 | O-6 | **i18n start** — English only vs English + one Indic locale in Phase 0 | Cheap now, brutal later | Donor ended with 6 × ~5,774-key dictionaries; rule is "never hardcode UI strings" from screen one. Still OPEN |
-| **O-7** | **A real AMRUT NIVAAS Supabase project for a hosted apply** | Any apply outside the local harness | The migrations have only ever been run against a local PostgreSQL 18.3 mirror (`db/harness/local-pg.sh`). A **hosted apply is not yet exercised** and needs the owner to provision the project (and to keep `007` off it) |
+| **O-7** | ~~A real AMRUT NIVAAS Supabase project for a hosted apply~~ | — | **RESOLVED (2026-10-07).** The owner provisioned a dedicated NIVAAS project — never the poultry one, which `db/harness/remote-apply.mjs` hard-refuses by ref. `000`–`014` (excluding dev-only `007`) are applied and re-read: 20/20 tenant tables under RLS, 50 `SECURITY DEFINER` doors, zero unprotected tables, anon table read 401, anon door call refused `NIVAAS_NO_SESSION`. `node db/harness/remote-apply.mjs plan\|apply\|check [--through nnn] [--with-seed]` is the operator path. Two things it did **not** buy: `db/verify` stays local-only by rule, and a live session still needs O-8 |
+| **O-8** | **GoTrue mailer + site URL configuration** | The sign-up half of the Phase 0 exit gate · every §78 auth row that needs a real session | The hosted project has **no SMTP transport** (`smtp_host` null) and `site_url` is still GoTrue's `http://localhost:3000` default, so an email link can be neither delivered nor returned to the app. Owner action in the Supabase dashboard; `mailer_autoconfirm` is correctly `false` and must stay so. Related owner chore: **revoke the Personal Access Token** used for the applies — it was pasted into chat and must be treated as spent |
