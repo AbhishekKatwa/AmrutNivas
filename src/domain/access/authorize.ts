@@ -5,9 +5,11 @@
  * on every denial. The server's door is the authority — this module exists so the
  * client can pre-flight the SAME ladder (route guards, disabled controls, the
  * access-denied screen) without inventing a second set of rules that drift from it.
- * The reason codes come from `config/security.ts`, which `authorize.test.ts` diffs
- * against the SQL text, so a renamed or reordered server step breaks a test rather
- * than quietly changing what users see.
+ * The reason codes come from `config/security.ts`, which `authorize.test.ts` used to
+ * diff against the SQL text, so a renamed or reordered server step broke a test rather
+ * than quietly changing what users see. That suite is deleted (2026-10-07, owner
+ * instruction); the ladder below is now mirrored from the migrations by hand, and the
+ * server's door remains the authority that refuses regardless of what this says.
  *
  * Pure by contract: no Supabase, no store, no async — every fact is something the
  * server's own resolvers already answer (`resolve_active_context`, `my_permissions`,
@@ -98,7 +100,9 @@ export function authorize(facts: AccessFacts): AccessDecision {
 /**
  * The sentence a person sees for a denial (§46, §63). The reason code itself stays
  * in the audit trail and the console; the copy carries no permission key and no
- * internal error token — `authorize.test.ts` enforces that on every entry.
+ * internal error token. `authorize.test.ts` used to assert that on every entry; the
+ * suite is deleted, so these sentences are checked by eye against §39/§63 and the
+ * reason code itself still goes to the audit trail and the console.
  */
 export function denialCopy(reason: AccessDenialReason): string {
   return DENIAL_MESSAGES[reason];

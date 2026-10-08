@@ -28,10 +28,14 @@ Proven, not asserted:
   unreachable from a client session 7, the invitation round trip 8, end-to-end write + archive-not-delete 9).
   This bar was **9 scenarios / 78 `PASS` assertions** at the #02 close; the file has only grown since — see the
   #03 and Phase 1 sections for the current measured total.
-- **Client suite green** — `npx vitest run`: **41 test files / 566 tests passing** at this stage (51 / 721 now),
-  in Node (no jsdom; render tests use `react-dom/server`'s `renderToStaticMarkup`, so effects never fire).
+- **Client suite — green at this stage, then DELETED** — `npx vitest run`: **41 test files / 566 tests passing**
+  at this stage (51 / 721 at the
+  #03 close). **Deleted on 2026-10-07** by owner instruction — see `docs/ARCHITECTURE.md` §13.5 — so this line is
+  history, not a gate; it ran in Node (no jsdom; render tests used `react-dom/server`'s `renderToStaticMarkup`,
+  so effects never fire).
 - **Typecheck + production build green** — `tsc --noEmit` is clean and `npm run build` succeeds: one JS chunk
-  of **721.15 kB** and **27.05 kB** of CSS at this stage (756.42 kB / 27.44 kB now). Vite's chunk-size warning on
+  of **721.15 kB** and **27.05 kB** of CSS at this stage (922.02 kB / 29.77 kB now, measured with the restaurant
+  client in the tree). Vite's chunk-size warning on
   that single bundle is known — route-level lazy code-splitting was deliberately **not** done in this stage.
 - **§97 checklist + §98 stage report** — `docs/ACCEPTANCE.md` maps every Prompt #02 requirement to the
   artefact that proves it, and names the `BLOCKED` / `NOT_TESTED` / `DEFERRED` ones instead of rounding them up.
@@ -45,14 +49,14 @@ Proven, not asserted:
 | Door error-token vocabulary + client normalisation | **IMPLEMENTED** (`src/db/door-errors.ts`, `src/lib/errors.ts`) — single-token refusals, never DB text |
 | Client data plane (env gate → memoized client → `callDoor`/`rows` → one case map) | **IMPLEMENTED** (`src/config/env.ts`, `src/db/*`) |
 | Context resolution (§29) + atomic switch + address-bar context (§30) | **IMPLEMENTED** (`src/domain/access/session-service.ts`, `src/state/context-store.ts`, `src/app/context-url.ts`) — the client never decides its own context; a non-uuid param is ignored rather than clearing the tenant, unrelated params survive, and an `askedFor` guard stops a switch and a URL rewrite from looping each other |
-| Tenant cache isolation + generation counter (§57–§59) | **IMPLEMENTED** (`src/state/tenant-cache.ts`) — proven in `src/state/tenant-cache.test.ts` (TypeScript, **not** the SQL verifier) |
-| Drift-killing tests (doors / error tokens / taxonomies diffed vs SQL, both directions) | **IMPLEMENTED** (`doors.test.ts`, `door-errors.test.ts`, `taxonomy.test.ts`, `routes.test.ts`) — `taxonomy.test.ts` also scrapes the client's own `domain.verb` gates (`clientPermissionTokens()` in `src/test-helpers/migrations.ts`) and diffs them against the seeded catalogue in `006`, so a capability the DB never seeded fails the suite instead of silently disabling a control forever |
+| Tenant cache isolation + generation counter (§57–§59) | **IMPLEMENTED** (`src/state/tenant-cache.ts`) — proven in the now-deleted `src/state/tenant-cache.test.ts` (TypeScript, **not** the SQL verifier), so the code exists but the isolation guarantee itself is **NOT_TESTED** and rests on code reading alone |
+| Drift-killing tests (doors / error tokens / taxonomies diffed vs SQL, both directions) | **DELETED 2026-10-07** (`doors.test.ts`, `door-errors.test.ts`, `taxonomy.test.ts`, `routes.test.ts` and `src/test-helpers/` removed by owner instruction — `docs/ARCHITECTURE.md` §13.5). What they made impossible — a client door the SQL does not define, a `NIVAAS_*` token with no copy, a picker offering a value the CHECK would refuse, a control gated on a permission the seed never granted, a nav row pointing at no route — is now possible again and fails at run time |
 | Shared UI primitives | **IMPLEMENTED** (`src/components/ui/*`: Button, Card, Field, Dialog, DataTable, Badge, StatusPill, EmptyState, Spinner, inputs/switch, ArchiveDialog, AccessDenied) |
 | Design system tokens + application shell + brand | **IMPLEMENTED** (Prompt #01) |
 | Money contract, public error model, identity types | **IMPLEMENTED** (Prompt #01) |
 | Real authentication (GoTrue sign-in, session persistence + refresh) | **DEFERRED → Prompt #03** — bootstrapped today by a seeded dev user + `claim_demo_organization()`; `persistSession: false`, `detectSessionInUrl: false` |
 | Invitation email delivery | **DEFERRED → Prompt #03** — accept door is proven (scenario 8); the link is never emailed |
-| Admin CRUD screens + onboarding wizard + context switcher UI | **IMPLEMENTED** — routes are data (`src/app/routes.ts` `ROUTES`, mapped inside `BrowserRouter` in `src/App.tsx` with a catch-all "not implemented" route; `src/app/navigation.ts` marks the live rows and `src/app/routes.test.ts` diffs the two lists); one screen per route under `src/pages/` (organization / properties / outlets / departments / team / roles / audit + the onboarding wizard); the header `ContextSwitcher` (§27–§30) renders the three-level picker with org-wide / property-wide sentinels and non-ACTIVE rows labelled, `ContextNotices` (store `notices` + `dismissNotice(id)`) surfaces a cleared context, and `AccessDenied`/`CapabilityNote` distinguish five denial causes so only a real `role` refusal names a permission or an administrator. **End-to-end browser data flow is NOT_TESTED** — no PostgREST locally, so the app boots into its honest "no data plane" state (see "Not yet exercised") |
+| Admin CRUD screens + onboarding wizard + context switcher UI | **IMPLEMENTED** — routes are data (`src/app/routes.ts` `ROUTES`, mapped inside `BrowserRouter` in `src/App.tsx` with a catch-all "not implemented" route; `src/app/navigation.ts` marks the live rows; `src/app/routes.test.ts` used to diff the two lists and is deleted (§13.5), so a nav row now points at a route only because someone kept them aligned by hand); one screen per route under `src/pages/` (organization / properties / outlets / departments / team / roles / audit + the onboarding wizard); the header `ContextSwitcher` (§27–§30) renders the three-level picker with org-wide / property-wide sentinels and non-ACTIVE rows labelled, `ContextNotices` (store `notices` + `dismissNotice(id)`) surfaces a cleared context, and `AccessDenied`/`CapabilityNote` distinguish five denial causes so only a real `role` refusal names a permission or an administrator. **End-to-end browser data flow is NOT_TESTED** — no PostgREST locally, so the app boots into its honest "no data plane" state (see "Not yet exercised") |
 
 ### Prompt #03 — delivered (Phase 0 security substrate)
 
@@ -73,14 +77,24 @@ forbade inventing one and GoTrue magic links already satisfy "a real session"):
    Scenarios 11–14. DEPARTMENT-scope grants stay **refused, not half-wired** (D-26) — `assign_role` still answers
    `NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED`, and `my_permissions` resolves organization/property/outlet only.
 4. **`evaluate_access` + `authorize()`** — the non-raising access decision the client pre-flights with (`010`,
-   D-30), mirrored as a pure ladder in `src/domain/access/authorize.ts` and tested against every denial reason,
-   so the UI and the database cannot disagree about *why* someone was refused.
+   D-30), mirrored as a pure ladder in `src/domain/access/authorize.ts`. It used to be tested against every
+   denial reason (`authorize.test.ts`, deleted 2026-10-07 with the rest of the suite — `docs/ARCHITECTURE.md`
+   §13.5), which is what kept UI and database from disagreeing about *why* someone was refused. The server half
+   is still scenario-proven (`010`'s outcomes, scenario 12); the client mirror is now kept in step by hand
+   alone, and nothing catches it drifting.
 
-**Proof:** `db/verify` **15 scenarios / 195 `PASS` assertions / 0 failures on a cold rebuild**; client suite
+**Proof (as measured at the #03 close, on 2026-10-07):** `db/verify` **15 scenarios / 195 `PASS` assertions /
+0 failures on a cold rebuild**; client suite
 **51 files / 721 tests**; `npx tsc --noEmit --incremental false` clean; `npm run build` 756.42 kB + 27.44 kB;
 `docs/SECURITY.md`, `docs/PERMISSIONS.md` (54-token catalogue) and the drift gates
 (`permissions.test.ts`, `doors.test.ts`, `door-errors.test.ts`, `taxonomy.test.ts`) green in both directions.
 The §78 checklist and the §81 stage report are `docs/ACCEPTANCE-03.md`.
+**Of that list, only the SQL half still exists.** The client suite and every drift gate in it were deleted on
+2026-10-07 by owner instruction (`docs/ARCHITECTURE.md` §13.5), so the sentence above is a snapshot of where
+#03 left off rather than a gate anything in this repository still runs. What has been re-measured since is
+recorded in Phase 1 below: the verifier has grown to **twenty scenarios / 742 `PASS` assertions, 0 failures**,
+last recorded cold on 2026-10-08 (`db/harness/local-pg.sh rebuild`, ending `ALL SCENARIOS PASSED`), and the
+typecheck and build are green with the restaurant client in the tree.
 
 **Exit gate for Phase 0:** a real person can sign up, create an organization, add two properties with different
 currencies/timezones, add an outlet to each, invite a second user with a different role, and see tenant B
@@ -89,18 +103,21 @@ provably unable to read tenant A's rows at the database level. The tenancy/RBAC/
 configuration**, not on code — see the next list.
 
 **Not yet exercised (read as pending, not done):**
-- **A behavioural run against the hosted project.** `000`–`014` (minus the dev-only `007`) are applied to the real
-  AMRUT NIVAAS Supabase project and re-read structurally — 20/20 tenant tables under RLS, 50 doors, zero
-  unprotected tables, anonymous table read refused 401, anonymous door call refused `NIVAAS_NO_SESSION`. The
-  195-assertion scenario file is **deliberately never run hosted** (`db/harness` keeps it local-only).
+- **A behavioural run against the hosted project.** `000`–`019` (minus the dev-only `007`) are applied to the real
+  AMRUT NIVAAS Supabase project and re-read structurally — **29/29 tenant tables under RLS, 79 doors, zero
+  unprotected tables**, anonymous table read refused 401, anonymous door call refused `NIVAAS_NO_SESSION`. The
+  scenario file is **deliberately never run hosted** (`db/harness` keeps it local-only), so what the hosted
+  project has is a structural posture and a set of applied self-checks, not a restaurant attack.
 - **A delivered sign-in link** — the hosted project has **no SMTP transport** (`smtp_host` null) and `site_url`
   is still GoTrue's `http://localhost:3000` default, so a magic link can be neither sent nor landed on the app.
   Owner action, through the Supabase dashboard.
-- **End-to-end browser data flow** — PostgREST is not installed locally, and the hosted stack has not been driven
-  from a browser in this session (**NOT_TESTED**). With no project keys the app boots into its honest
+- **End-to-end browser data flow** — the built bundle has been driven once (2026-10-08, 413px): every restaurant
+  and admin route falls back to `/sign-in` with an empty console and no overflow, which proves the guard only.
+  PostgREST is not installed locally and hosted GoTrue cannot send a link, so no signed-in screen has ever
+  rendered (**NOT_TESTED**). With no project keys the app boots into its honest
   "no data plane" state rather than showing placeholder rows.
-- **Cache / state isolation (§57–§59)** — proven in `src/state/tenant-cache.test.ts`, asserted NOT covered by
-  the SQL verifier.
+- **Cache / state isolation (§57–§59)** — was proven in `src/state/tenant-cache.test.ts` (now deleted, §13.5);
+  it has never been covered by the SQL verifier, so nothing proves it today.
 
 ---
 
@@ -111,7 +128,7 @@ configuration**, not on code — see the next list.
 Prerequisites: Phase 0 complete (tenancy, RBAC, audit) and **the printing decision resolved** — KOT/KDS is
 where an unresolved print architecture becomes a customer-visible failure.
 
-**Code complete, unverified (Prompt #04).** `013` seeded the 27 restaurant tokens onto the system roles and proved the
+**Applied, compiled, still unbehaved (Prompt #04).** `013` seeded the 27 restaurant tokens onto the system roles and proved the
 permission ladder in-SQL; `014` created the six menu tables and their 19 doors, and scenario 15 attacks them.
 `015` adds dining areas, tables, their ordering and the derived `restaurant_table_status` view (9 doors);
 `016` adds orders, order items, the order ladder, `app.calculate_restaurant_totals` — the product's only money
@@ -121,11 +138,23 @@ engine — the document-number counter and the outlet business-date resolver (8 
 `restaurant_day_overview`, so a trading day is one door read rather than a client-side aggregation.
 Six screens now sit on those doors: `/menu`, `/tables`, `/pos`, `/billing`, `/kitchen`, `/restaurant`.
 
-**But `015`–`019` have not been applied to any database in this sequence**, no verifier scenario touches the
-restaurant tables yet, and no screen has been loaded in a browser. The phase's own acceptance doc,
-`docs/ACCEPTANCE-04.md`, records every clause as `BUILT, NOT_VERIFIED` — which is the accurate status, not a
-formality. This phase is therefore *complete in design and unproven in fact*; the end pass (harness rebuild,
-new scenarios, `tsc`/`build`, and driving each screen) is the next action, not more code.
+**What the end pass has since established** (2026-10-07, re-measured on the cold rebuild of 2026-10-08):
+`013`–`019` apply cleanly and their own self-checks
+pass on a cold `./db/harness/local-pg.sh rebuild` — 20 migrations, **twenty verifier scenarios / 742 `PASS`
+assertions, 0 failures, ending `ALL SCENARIOS PASSED`** — and the same set is
+recorded on the hosted project (`000`–`019` minus `007`: 29/29 tables under RLS, 79 doors). `npx tsc --noEmit
+--incremental false` is clean across `src` and `npm run build` succeeds with the six screens in the tree
+(922.02 kB JS / 29.77 kB CSS). Scenarios 15–20 are Prompt #04's coverage: 15 the permission ladder and menu
+(`013`/`014`), 16 the floor (`015`), 17 orders, lines and the order machine (`016`), 18 the calculation engine,
+bill and payments (`017`), 19 kitchen order tickets (`018`), 20 the `restaurant_day_overview` read (`019`).
+
+**What is still not proved:** the server side of the money path now *is* asserted — the totals engine, the
+payment immutability wall, the KOT replay index and the single day read each have verifier scenarios behind them
+— but **no restaurant screen has been loaded in a browser**, so nothing proves a screen calls the door it should
+or renders a door's figure unchanged (**NOT_TESTED**). With the client suite deleted on 2026-10-07
+(`docs/ARCHITECTURE.md` §13.5) there is no automated check on that half at all; it is the open gap, not a
+measured one. `docs/ACCEPTANCE-04.md` holds the
+per-clause record. Nothing in this phase may be read as done until a screen has actually rendered.
 
 Still genuinely out of scope for #04, by decision rather than omission: the tax engine (`014` leaves the tax
 category an unresolved placeholder and `017` freezes `tax_rate` at zero), bill splits, shifts, day close and the

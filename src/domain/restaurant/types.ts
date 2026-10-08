@@ -4,9 +4,12 @@
  * Types only in this section — the services live beside it. This module is the client's mirror
  * of the schema's restaurant tables, and it exists for one reason: every list below is a
  * picker's contents, and a picker that offers a value the database's CHECK refuses is a 500 at
- * the door. So each array is compared by `domain/identity/taxonomy.test.ts` against the CHECK
- * constraint in the matching `db/supabase/NNN_*.sql`, in both directions, exactly as the
- * identity vocabularies are compared against 001/002.
+ * the door. So each array must match the CHECK constraint in the matching
+ * `db/supabase/NNN_*.sql`, in both directions, exactly as the
+ * identity vocabularies match 001/002. `domain/identity/taxonomy.test.ts` used to
+ * diff them mechanically; the suite was deleted (2026-10-07, owner instruction), so
+ * the CHECK is the authority
+ * and a drift is answered by the door refusing the value.
  *
  * Hierarchy: Outlet → DiningArea → RestaurantTable.
  *
@@ -176,8 +179,8 @@ export type TableStatus = {
 /**
  * The two ways an order can be served (Prompt #04 §23).
  *
- * DINE_IN requires a table_id; TAKEAWAY does not. This array is compared by
- * `domain/identity/taxonomy.test.ts` against 016's CHECK constraint on orders.order_type.
+ * DINE_IN requires a table_id; TAKEAWAY does not. This array must match 016's CHECK
+ * constraint on orders.order_type; the test that diffed them is deleted.
  */
 export type OrderType = "DINE_IN" | "TAKEAWAY";
 

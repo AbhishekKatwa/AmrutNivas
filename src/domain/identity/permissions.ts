@@ -6,10 +6,13 @@
  * self-checks `count(*) = 25`), the two custom-role tokens `role.create` and
  * `role.edit` added in `011_custom_roles.sql`, and the 27 restaurant capabilities
  * seeded by `013_restaurant_permissions.sql`. No other migration inserts into
- * `role_permissions`. `permissions.test.ts` re-reads all three files and diffs them
- * against this list in both directions, so a seed that gains or drops a token
- * fails the build instead of shipping a button the doors refuse, or a doc naming
- * a capability nobody can grant.
+ * `role_permissions`. `permissions.test.ts` used to re-read all three files and diff
+ * them against this list in both directions, so a seed that gained or dropped a token
+ * failed the build instead of shipping a button the doors refuse, or a doc naming
+ * a capability nobody can grant. The suite is deleted (2026-10-07, owner instruction),
+ * so this list is hand-mirrored from those three seeds and the drift answers at the
+ * door. `018`'s permission-drift self-check (its gate over every `require_permission`
+ * literal against `role_permissions`) is the only mechanical proof that remains.
  *
  * This is a label-and-lookup layer, not a second permission system: 006's header
  * records the donor project's "role matrix lives twice" failure, so the answer to

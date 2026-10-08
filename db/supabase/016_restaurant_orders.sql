@@ -616,6 +616,16 @@ alter table public.document_counters enable row level security;
 revoke all on public.document_counters from authenticated, anon;
 grant select, insert, update on public.document_counters to service_role;
 
+-- ...and the same wall on the FUNCTION side of that table. Postgres grants a new function to PUBLIC,
+-- so revoking the table alone still leaves the minting helper callable by any signed-in role: a
+-- client that advances the day's counter with ORD- numbers it never books, and then collides a
+-- printed document against a number the sequence has already spent. The doors in 016/017/018 are
+-- SECURITY DEFINER and call it as their own owner, so the five verbs that legitimately need a
+-- number keep it while the surface a screen can reach has none. `service_role` is revoked too: it
+-- is trusted with the ROWS above, not with minting documents outside a door's permission check.
+revoke all on function app.next_document_number(uuid, uuid, uuid, text, date)
+  from public, anon, authenticated, service_role;
+
 -- ===================================================================== derived status
 --
 -- §20's other half, the part 015 explicitly handed to 016: the operational truth of a
@@ -765,6 +775,7 @@ as $$
     'DRAFT>PLACED',           -- the order is written; it goes to the pass
     'PLACED>CONFIRMED',       -- the restaurant accepts it
     'CONFIRMED>PREPARING',    -- the kitchen starts cooking  (§28: fire this, and CANCEL is gone)
+    'PLACED>PREPARING',       -- the kitchen starts cooking directly from PLACED (no explicit CONFIRMED)
     'PREPARING>READY',        -- cooked, waiting on runner
     'READY>SERVED',           -- on the cover / handed over
     'SERVED>COMPLETED',       -- closed; 017's settlement writes the bill around this

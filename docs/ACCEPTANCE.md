@@ -11,14 +11,21 @@ Reproduce the two proof layers with:
 
 ```
 npx tsc --noEmit --incremental false     # clean
-npx vitest run                           # 41 files / 566 tests
 npm run build                            # 721.15 kB JS + 27.05 kB CSS
-./db/harness/local-pg.sh rebuild         # 9 scenarios / 78 PASS assertions, 0 failures (PG 18.3)
+./db/harness/local-pg.sh rebuild         # 9 scenarios / 78 `PASS` as measured on the day — now twenty / 742
 ```
 
+> **The third proof layer this stage ran no longer exists.** It also ran `npx vitest run` — **41 files / 566
+> tests**, all green. Every `src/**/*.test.ts(x)` was deleted on 2026-10-07 by owner instruction ("no test cases,
+> ever again"), together with `src/test-helpers/` and the `test` script in `package.json`; `vitest` survives only
+> as an unused `devDependencies` entry. See `docs/ARCHITECTURE.md` §13.5. The SQL verifier is now the only proof
+> layer with assertions behind it, and that file has grown since this stage: **twenty scenarios / 742 `PASS`
+> assertions, 0 failures**, last recorded cold on PostgreSQL 18.3 on 2026-10-08.
+
 > **Frozen stage report.** These are the Prompt #02 numbers, kept as measured on the day. The tree has moved on:
-> `docs/ACCEPTANCE-03.md` records the current bar (51 files / 721 tests, 15 scenarios / 195 assertions,
-> `000`–`014` applied both locally and on the hosted AMRUT NIVAAS project) and closes §2's first three rows —
+> `docs/ACCEPTANCE-03.md` recorded the bar at the #03 close (51 files / 721 tests — that suite is now deleted —
+> and 15 scenarios / 195 assertions, since grown to twenty / 742), `000`–`014` applied both locally and on the
+> hosted AMRUT NIVAAS project, and it closes §2's first three rows —
 > the hosted project now exists, real sign-in code has landed, and only SMTP delivery remains blocked on the
 > owner.
 
@@ -28,24 +35,24 @@ npm run build                            # 721.15 kB JS + 27.05 kB CSS
 
 | Requirement | Proven by | Status |
 | --- | --- | --- |
-| `Organization → Property → Outlet → Department` hierarchy, organization is the tenant boundary | `db/verify/tenant_isolation.sql` scenarios 1, 3, 9; `src/domain/hierarchy/*-service.test.ts` (59 tests across the four levels) | PASS |
-| `User → Membership → Organization → Property access → Outlet access → Role` chain | scenarios 6, 9f, 9g, 9g2; `src/domain/access/role-service.test.ts`, `people-service.test.ts` | PASS |
-| All authorization is server-side; a client has SELECT only and every write enters a `SECURITY DEFINER` door | scenario 2 (direct write refused by grant alone); `src/db/doors.test.ts`, `src/db/rpc.test.ts` | PASS |
+| `Organization → Property → Outlet → Department` hierarchy, organization is the tenant boundary | `db/verify/tenant_isolation.sql` scenarios 1, 3, 9; `src/domain/hierarchy/*-service.test.ts` (59 tests across the four levels) **deleted 2026-10-07** — the SQL scenarios are what remain | PASS |
+| `User → Membership → Organization → Property access → Outlet access → Role` chain | scenarios 6, 9f, 9g, 9g2 (the `role-service.test.ts` / `people-service.test.ts` half is **deleted 2026-10-07**) | PASS |
+| All authorization is server-side; a client has SELECT only and every write enters a `SECURITY DEFINER` door | scenario 2 (direct write refused by grant alone) + each migration's self-check block (`NIVAAS_MIGRATION_GAP`); `src/db/doors.test.ts`, `src/db/rpc.test.ts` **deleted 2026-10-07**, so the client door list is no longer diffed against `public` | PASS |
 | Cross-tenant reads and cross-tenant foreign ids are refused, by RLS and again at the door | scenarios 1, 3 (guessed foreign uuids), and the `NIVAAS_SCOPE_MISMATCH` assertions | PASS |
-| Invitations: create, accept, revoke; exactly one owner per organization | scenario 8 (accept round trip with a seeded identity), `memberships_one_owner_idx` assertion; `people-service.test.ts` | PASS — the **email itself** is DEFERRED → Prompt #03 |
-| Context switching, server-persisted active context, re-proving every level on each load (§29) | `session-service.test.ts` (13), `context-store.test.ts` (11), scenario 5 (a saved context cannot outlive the access that justified it) | PASS |
-| Context in the URL, including a hostile or malformed param (§30) | `src/app/context-url.test.ts` (13) — non-uuid is ignored rather than clearing a tenant, unrelated params survive, the `askedFor` guard breaks the switch↔URL loop | PASS |
-| The switcher UI shows only what the session can reach, and deeper pickers disable with the shallower one | `src/app/ContextSwitcher.test.tsx` (14) | PASS at 4188 in a browser on the no-data-plane build; with a real session it is BLOCKED (see §2) |
-| Onboarding wizard, both honest paths, with **no fabricated capability gate** | `Onboarding.test.tsx` (28) — `stepPermissionFor("organization")` is null because `create_organization` needs only a session | PASS |
-| Admin CRUD with archive as the lifecycle; nothing hard-deletes | scenario 9c (archiving keeps the row and records why), 9e; `ArchiveDialog.test.tsx`; every service suite's archive cases | PASS |
-| Optimistic `version` and a mandatory `p_reason` on every state change | `doors.test.ts` parameter checks against the migration signatures; door refusals asserted with a single `NIVAAS_*` token | PASS |
+| Invitations: create, accept, revoke; exactly one owner per organization | scenario 8 (accept round trip with a seeded identity), `memberships_one_owner_idx` assertion, and scenario 14 for the `012` lifecycle; `people-service.test.ts` **deleted 2026-10-07** | PASS — the **email itself** is DEFERRED → Prompt #03 |
+| Context switching, server-persisted active context, re-proving every level on each load (§29) | scenario 5 (a saved context cannot outlive the access that justified it) proves the server half; `session-service.test.ts` (13) and `context-store.test.ts` (11) are **deleted 2026-10-07**, so the client re-proving path is code reading only | PASS server-side; client half code reading only — NOT_TESTED |
+| Context in the URL, including a hostile or malformed param (§30) | `src/app/context-url.test.ts` (13) — non-uuid is ignored rather than clearing a tenant, unrelated params survive, the `askedFor` guard breaks the switch↔URL loop — **was the only evidence; deleted 2026-10-07**. The server half (`set_active_context` re-proving every level) is scenario 5; the URL parsing itself is now assured only by reading `context-url.ts` | NOT_TESTED (code reading only) |
+| The switcher UI shows only what the session can reach, and deeper pickers disable with the shallower one | `src/app/ContextSwitcher.test.tsx` (14) — **deleted 2026-10-07**, and it is the only artefact behind this row | NOT_TESTED — the shell-only browser pass at `:4188` (no data plane) does not exercise it; with a real session it stays BLOCKED (see §2) |
+| Onboarding wizard, both honest paths, with **no fabricated capability gate** | `Onboarding.test.tsx` (28) — `stepPermissionFor("organization")` is null because `create_organization` needs only a session — **deleted 2026-10-07**. `006_seed_rbac.sql` self-checks its own 25 grants, but no artefact now asserts the wizard's step→token mapping | NOT_TESTED (code reading only) |
+| Admin CRUD with archive as the lifecycle; nothing hard-deletes | scenario 9c (archiving keeps the row and records why), 9e; `ArchiveDialog.test.tsx` and every service suite's archive cases are **deleted 2026-10-07** — the server lifecycle is still scenario-proven, the dialog is code reading only | PASS server-side; the UI half is code reading only — NOT_TESTED |
+| Optimistic `version` and a mandatory `p_reason` on every state change | the verifier's `NIVAAS_VERSION_CONFLICT` and `NIVAAS_REASON_REQUIRED` refusals (8 and 11 assertions) against the real doors. `doors.test.ts`'s parameter checks against the migration signatures are **deleted 2026-10-07**, so a client door drifting from its SQL signature is no longer caught | PASS |
 | `DEPARTMENT`-scoped grants are refused outright, not half-wired | scenario 9f2 — `assign_role` refused with `NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED` | PASS |
-| Audit trail: append-only, read-only, records the writes (§47/§48) | scenario 9e + the `NIVAAS_AUDIT_IMMUTABLE` delete assertion; `audit-service.test.ts` (9); `AuditPage` has no edit or clear control | PASS |
-| Tenant, cache and state isolation across a switch (§57–§59) | `tenant-cache.test.ts` (9), `context-store.test.ts` — scope keying, generation bump, an in-flight fetch from a discarded switch cannot commit | PASS |
-| Access denied is honest about its cause (§51) | `AccessDenied.test.tsx` (12) + `accessReasonFor` — five causes; only a loaded role set may say "denied by your role", `hint` and the admin suggestion are withheld otherwise. Same model in `CapabilityNote` | PASS |
-| A permission token the seed never granted fails the suite | `clientPermissionTokens()` in `src/test-helpers/migrations.ts` diffed against `006_seed_rbac.sql` in `taxonomy.test.ts`; proven to reject by injecting a bogus token and watching the test name it | PASS |
-| Route table and navigation registry agree; no nav row points at nothing | `routes.test.ts` (5) | PASS |
-| Typecheck, suite, production build | commands above | PASS |
+| Audit trail: append-only, read-only, records the writes (§47/§48) | scenario 9e + the `NIVAAS_AUDIT_IMMUTABLE` delete assertion; `audit-service.test.ts` (9) is **deleted 2026-10-07**; `AuditPage` having no edit or clear control is code reading only | PASS |
+| Tenant, cache and state isolation across a switch (§57–§59) | `tenant-cache.test.ts` (9) and `context-store.test.ts` — scope keying, generation bump, an in-flight fetch from a discarded switch cannot commit — **were the only evidence and are deleted 2026-10-07**; this was always a TypeScript concern and has never been covered by the SQL verifier | NOT_TESTED (code reading only) |
+| Access denied is honest about its cause (§51) | `AccessDenied.test.tsx` (12) + `accessReasonFor` — five causes; only a loaded role set may say "denied by your role", `hint` and the admin suggestion are withheld otherwise. Same model in `CapabilityNote`. **The test is deleted 2026-10-07**; the cause wording lives or dies on `src/config/security.ts` reading | NOT_TESTED (code reading only) |
+| A permission token the seed never granted fails the suite | `clientPermissionTokens()` in `src/test-helpers/migrations.ts` diffed against `006_seed_rbac.sql` in `taxonomy.test.ts`; proven to reject by injecting a bogus token and watching the test name it. **`taxonomy.test.ts` and `src/test-helpers/` are deleted (2026-10-07), so nothing fails any more** — `006`/`013` self-check their own seeded counts, but a client token with no seed behind it now compiles, ships and gates a control no grant can satisfy (`docs/ARCHITECTURE.md` §13.5) | NOT_TESTED — **live risk, unenforced** |
+| Route table and navigation registry agree; no nav row points at nothing | `routes.test.ts` (5) — **deleted 2026-10-07**, and it is the only artefact that compared `ROUTES` with the `navigation.ts` registry in both directions | NOT_TESTED (code reading only) |
+| Typecheck + production build | commands above | PASS |
 | Console-clean app shell in a real browser | `vite preview` at `:4188` — `/`, `/properties`, `/audit`, `/onboarding`, `/banquets`, plus a malformed `?organization=not-a-uuid&tab=x`: zero console messages | PASS (on the no-data-plane build) |
 
 ## 2. Not covered — and why
@@ -69,13 +76,16 @@ single-token `NIVAAS_*` refusals, mandatory reasons, optimistic versions, archiv
 retirement path, and an append-only trail every write door enters. Above it: the identity taxonomy,
 scoped services, the context store with server-side persistence and re-proving, the URL as a
 context carrier, the switcher and notices, nine routed screens including the onboarding wizard and
-the admin CRUD set — and a route/nav registry that cannot advertise a screen that does not exist.
+the admin CRUD set — and a route/nav registry that, at this stage, a deleted `routes.test.ts` kept from
+advertising a screen that does not exist; nothing holds that guarantee today (§13.5).
 
 **Three defects this stage found and fixed at their root, not per screen.**
 1. A gate on `organization.create` — a token the seed never grants — would have disabled the
    wizard's first step forever for every person on the system. The gate now names each step's own
-   door, and a scraped-and-diffed drift test means the *class* of bug (a client token with no seed
-   behind it) now fails CI instead of shipping.
+   door, and at this stage a scraped-and-diffed drift test meant the *class* of bug (a client token
+   with no seed behind it) failed CI instead of shipping. **That drift test (`taxonomy.test.ts`) was
+   deleted on 2026-10-07**, so the class of bug is catchable again only by hand — see
+   `docs/ARCHITECTURE.md` §13.5 and the §97 row above.
 2. `AccessDenied` asserted "denied by your role (`audit.view`)" on a build that has no backend, no
    session, or no tenant selected — a server decision that never happened. It now reads the session
    and picks among five causes; only a loaded role set earns the role wording.

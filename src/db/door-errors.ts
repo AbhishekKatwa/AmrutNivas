@@ -10,8 +10,10 @@
  *   - the map is total over the tokens the database can raise, and
  *   - an unrecognised message falls back to INTERNAL with a message written here,
  *     never the database's own text.
- * `db/door-errors.test.ts` reads `db/supabase/*.sql` and fails if any token in the
- * migrations is missing from this table, which is what keeps the two in step.
+ * `db/door-errors.test.ts` read `db/supabase/*.sql` and failed if any token in the
+ * migrations was missing from this table. That test is deleted with the suite, so
+ * totality is now held by hand — which is exactly why the fallback below exists:
+ * an unmapped token still lands on INTERNAL, never on the database's own text.
  */
 
 import { AppError, type ErrorCode } from "@/lib/errors";

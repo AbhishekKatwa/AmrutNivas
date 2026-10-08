@@ -28,10 +28,12 @@ export type EntityId = string;
 /*
  * Each status and taxonomy below is declared twice on purpose: as a type for the
  * compiler and as a `const` array for the runtime. The arrays are what the admin
- * selects render, and `domain/identity/taxonomy.test.ts` compares each one against
- * the CHECK constraint in the migration, so the pickers can never offer a value the
+ * selects render, and `domain/identity/taxonomy.test.ts` used to compare each one against
+ * the CHECK constraint in the migration, so the pickers could never offer a value the
  * database would refuse (the donor project's property-type list drifted exactly
- * this way and a write failed at the door).
+ * this way and a write failed at the door). That test is deleted with the suite, so
+ * the CHECK in the migration is the authority and these arrays are mirrored from it
+ * by hand.
  */
 
 /** The tenant's own lifecycle. There is no `INACTIVE`: a group is trading or not. */

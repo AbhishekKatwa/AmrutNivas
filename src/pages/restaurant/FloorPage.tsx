@@ -227,8 +227,8 @@ export function derivedStatusOf(tile: FloorTile): TableDerivedStatus {
  * The picker's contents — the THREE manual states only.
  *
  * This is the client half of 015's CHECK, and it is derived from the domain array rather than
- * typed out again so the drift test in `domain/identity/taxonomy.test.ts` stays the only other
- * copy of the rule. OCCUPIED and RESERVED never appear here because no door accepts them.
+ * typed out again, so 015's CHECK stays the single authority and this file holds no
+ * second copy of the rule. OCCUPIED and RESERVED never appear here because no door accepts them.
  */
 export function serviceStatusOptions(): SelectOption<TableServiceStatus>[] {
   return TABLE_SERVICE_STATUSES.map((value) => ({

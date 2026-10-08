@@ -905,7 +905,7 @@ function SlipLineRow({ line, live, busy, onRing }: SlipLineRowProps) {
         <span
           className={`text-sm font-semibold ${voided ? "text-muted line-through" : "text-ink"}`}
         >
-          {line.quantity} × {line.itemNameSnapshot}
+          {line.quantity} × {line.itemName}
           {line.itemCode !== null ? (
             <span className="ml-2 text-xs font-normal text-muted">{line.itemCode}</span>
           ) : null}

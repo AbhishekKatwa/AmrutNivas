@@ -3,17 +3,21 @@
 **Positioning:** The Operating System for Hospitality — a multi-tenant, multi-property, multi-outlet,
 multi-role, multi-language, multi-currency, AI-ready hospitality SaaS.
 **Status of this document:** Prompt #01 direction, corrected against what Prompt #02, #03 and #04 actually built. The tenancy data plane, the tenant architecture and the authentication/RBAC/audit
-hardening are **IMPLEMENTED and executed** — `db/supabase/000`–`014` applied twice over: against a real
-PostgreSQL 18.3 in `db/harness/` (and attacked by `db/verify/tenant_isolation.sql`: **15 scenarios, 195 `PASS`
-assertions, 0 failures**) and against the hosted AMRUT NIVAAS Supabase project (`000`–`014` minus the dev-only
-`007`; 20/20 tenant tables under RLS, 50 `SECURITY DEFINER` doors, no unprotected table). The client mirror
-lives in `src/db`, `src/domain` and `src/state`, the built shell/screens in `src/app` and `src/pages`, and the
-suite is **51 files / 721 tests**. `013`/`014` are Prompt #04's substrate — the restaurant permission ladder and
+hardening are **IMPLEMENTED and executed** — `db/supabase/000`–`019` applied against a real
+PostgreSQL 18.3 in `db/harness/` (and attacked by `db/verify/tenant_isolation.sql`: **twenty scenarios, 742
+`PASS` assertions, 0 failures on the cold rebuild last recorded 2026-10-08**) and against the hosted AMRUT
+NIVAAS Supabase project (`000`–`019`
+minus the dev-only `007`; **29/29 tenant tables under RLS, 79 `SECURITY DEFINER` doors**, no unprotected table).
+The client mirror lives in `src/db`, `src/domain` and `src/state`, the built shell/screens in `src/app` and
+`src/pages`. `013`/`014` are Prompt #04's substrate — the restaurant permission ladder and
 the menu domain — and are described here because they are schema facts, not because the module is finished.
-**The rest of the restaurant is written and unproven.** `015` (floors, areas, tables, the derived status view),
+**The restaurant SQL is applied; its behaviour is still unproven.** `015` (floors, areas, tables, the derived status view),
 `016` (orders, order items, the order ladder, `app.calculate_restaurant_totals`), `017` (bills, payments, the
-five tender doors), `018` (KOT) and `019` (`restaurant_day_overview`) exist as migrations with in-file
-self-checks, and **no harness or hosted run after `014` is recorded for any of them** — nor for their client
+five tender doors), `018` (KOT) and `019` (`restaurant_day_overview`) each carry an in-file self-check that
+passed on both the local harness and the hosted project, and scenarios 15–20 attack `013`–`019`: 15–16 the
+ladder, menu and floor, 17 orders and the order machine, 18 the calculation engine, bills and payments, 19 the
+KOT, 20 the day read. **What that proves is the server side.** No restaurant screen has been loaded in a
+browser — nor for their client
 (`src/domain/restaurant/{menu,floor,order,bill,kot,day}-service.ts`, six screens in `src/pages/restaurant`).
 That work is described below because it is the design, not because it is verified;
 `docs/ACCEPTANCE-04.md` holds the row-by-row verdicts, all of which read `BUILT, NOT_VERIFIED`. Prompt #04 adds
@@ -70,7 +74,8 @@ AMRUT NIVAAS PLATFORM
 - **Property types are data, not code paths:** the `property_type` CHECK on `public.properties` allows exactly
   eleven values — HOTEL, LODGE, RESORT, HOSTEL, RESTAURANT, CAFE, CLOUD_KITCHEN, BANQUET, CONVENTION_CENTER,
   RESTAURANT_HOTEL, OTHER — and that list is the taxonomy the whole product branches on
-  (`PROPERTY_TYPES` in `src/domain/identity/types.ts`, diffed against the SQL by `taxonomy.test.ts`).
+  (`PROPERTY_TYPES` in `src/domain/identity/types.ts` — a hand copy of the SQL CHECK; §13.5 explains why
+  nothing diffs it any more).
   `BOUTIQUE_HOTEL` is deliberately **not** a property type: it lives only in `organizations.business_types`,
   a self-descriptive array (`BUSINESS_TYPES`, twelve values) that a group uses to say what it operates. A
   group can hold several formats across its sites, so the switch is `property_type`, never `business_types`.
@@ -138,14 +143,17 @@ user_active_contexts) and the RLS + access-resolution helpers in `003_rls.sql` /
   DEPARTMENT as un-grantable data; resolving it is a named future phase, not a silent half-wire.
 - **Permissions are strings of shape `domain.verb`** — `006_seed_rbac.sql` ships 13 system roles and 25
   permissions, `011_custom_roles.sql` adds `role.create`/`role.edit` for a total of **27** keys across 8
-  domains, and `taxonomy.test.ts` checks each seeded verb matches `PERMISSION_PATTERN` and that every verb
-  the admin screens gate on is present. `docs/PERMISSIONS.md` is the admin-readable catalogue.
-- **One source of truth, enforced by diffing rather than by promise** (this replaced the donor's "matrix
-  lives twice and drifts" bug): `src/db/doors.ts`, `src/db/door-errors.ts` and every client status/taxonomy
-  list in `src/domain/identity/types.ts` are each compared **against the SQL itself, in both directions** by
+  domains. Each seeded verb matched `PERMISSION_PATTERN` and every verb the admin screens gate on was present,
+  checked by the deleted `taxonomy.test.ts` (§13.5); the SQL CHECK and the seed self-checks are what remain.
+  `docs/PERMISSIONS.md` is the admin-readable catalogue.
+- **One source of truth — enforced by the database, diffed by nobody since §13.5** (this replaced the donor's
+  "matrix lives twice and drifts" bug): `src/db/doors.ts`, `src/db/door-errors.ts` and every client status/
+  taxonomy list in `src/domain/identity/types.ts` are copies of what the SQL defines. They used to be compared
+  **against the SQL itself, in both directions** by
   `src/db/doors.test.ts`, `src/db/door-errors.test.ts` and `src/domain/identity/taxonomy.test.ts`. A door
   added server-side but not listed, a token raised but not mapped, a picker offering a value the CHECK would
-  refuse, or a listed door renamed away — all fail the suite. See §13.
+  refuse, or a listed door renamed away — all failed the suite, and now fail silently at run time instead.
+  The SQL half is still self-checked at migration time; the client half is unguarded. See §13.
 - **Enforcement is in the write path, not the nav.** A screen that only hides a button is not authorized.
   The door re-proves membership and permission before it acts, and the UI merely reflects that refusal;
   `my_permissions` output is a display aid and is re-asked by every door on every write.
@@ -187,7 +195,9 @@ AuditEvent { actorId, organizationId, propertyId, outletId, action, entity, enti
 - Currency is a **property-level setting**; formatting and grouping are derived from locale, so `en-IN`
   lakh/crore grouping and `en-US` thousands grouping both work without code branches.
 - Rates are `numeric`, never `float`; rounding is explicitly specified per document type
-  (bill total vs line vs tax) and is a tested function, not an ad-hoc `toFixed`.
+  (bill total vs line vs tax) and was a tested function, not an ad-hoc `toFixed`. The client money tests were
+  deleted on 2026-10-07 (§13.5), so the client rounding path is now code reading only; what is still asserted is
+  the server engine, whose exact-decimal totals and tender behaviour verifier scenarios 17–18 attack.
 - **Tax is configuration, never a constant.** No hardcoded GST slab, no hardcoded tax region. A tax
   template (SAC/HSN, rate, compoundability, place-of-supply rules) is a versioned record; documents store
   the template version they were billed under so history never re-prices itself.
@@ -255,7 +265,9 @@ InvoiceCreated · PaymentReceived · EventBooked · EmployeeAbsent
 
 **There is no REST API layer.** The shipped data plane is PostgREST calling `SECURITY DEFINER` doors directly
 (§13): every write is `POST /rpc/<door>`, every read is a scoped `SELECT` under RLS. The door list in
-`src/db/doors.ts` *is* the API surface, and it is diffed against the schema on every test run.
+`src/db/doors.ts` *is* the API surface. It used to be diffed against the live schema on every test run
+(`doors.test.ts`, deleted 2026-10-07 by owner instruction — §13.5); the list is now kept in step by hand, while
+the SQL side still self-checks the doors it creates.
 
 The principles a future REST gateway must keep are unchanged — versioned paths
 (`/api/v1/organizations · /api/v1/properties · …`), input validated at the boundary, authorization enforced
@@ -283,8 +295,9 @@ new AppError(code, message)       →  toPublicError() maps code → status via 
   `NIVAAS_NO_SESSION`, `NIVAAS_SCOPE_MISMATCH`, `NIVAAS_VERSION_CONFLICT`, `NIVAAS_REASON_REQUIRED`,
   `NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED` and the rest. That keeps the client from parsing prose and from
   surfacing a schema detail to a browser. `door-errors.ts` is the only place a token becomes copy, and the
-  table is **total** over what the SQL can raise — `door-errors.test.ts` fails if any token in the
-  migrations is unmapped *or* any mapped token is no longer raised.
+  table is **total** over what the SQL can raise — that totality used to be a build failure
+  (`door-errors.test.ts`, §13.5) and is now maintained by hand: an unmapped token falls through to the generic
+  refusal, a stale copy sits unused.
 - **No token, only SQLSTATE:** a failure with no `NIVAAS_*` token is classified by PostgREST's own stable
   code — `42501` → PERMISSION_DENIED, `23505`/`23514` → CONFLICT, `23503` → TENANT_SCOPE_MISMATCH,
   `40001`/`40P01` → retryable CONFLICT — and everything else falls back to `INTERNAL` with a message written
@@ -392,8 +405,9 @@ on — `?property=1` names nothing and must not clear the session. The trap is a
 store → URL), so `useSyncContextWithUrl` records the exact search string it last `askedFor`: a link the server
 narrowed is corrected to the server's answer instead of being re-tried every render. Because the URL string is
 only what was *asked for*, it is never trusted — `set_active_context` and `resolve_active_context` re-prove
-every level, which is why a stale link narrows rather than leaks. `src/app/context-url.test.ts` proves the
-parsing round-trips idempotently, which is what makes the correction terminate.
+every level, which is why a stale link narrows rather than leaks. `src/app/context-url.test.ts` proved the
+parsing round-trips idempotently, which is what made the correction terminate; that suite is §13.5's, deleted,
+so the round-trip is now assured by reading `context-url.ts` alone.
 
 ### 13.3 Tenant cache and the generation counter
 
@@ -412,8 +426,9 @@ timers and no TTLs. `invalidateScope(prefix)` physically reclaims a tenant subtr
 it. The context store owns this lifecycle: it activates the new scope first (bumping the generation to gate
 in-flight reads), then invalidates the old scope only when the new one does not sit inside the same tenant —
 drilling deeper into one tenant keeps that tenant's rows warm, since they cannot cross the boundary. **This
-is proven in `src/state/tenant-cache.test.ts`, in TypeScript, not in the SQL verifier** — see the closing
-list. All UI state is in memory: there is no `persist` middleware and no localStorage writer, because a
+was proven in `src/state/tenant-cache.test.ts`; that file is deleted (§15), so the claim now rests on the code
+and this paragraph alone** — it was never covered by the SQL verifier. All UI state is in memory: there is no
+`persist` middleware and no localStorage writer, because a
 multi-tenant cache living in a browser is a leak waiting to happen.
 
 ### 13.4 Frontend layout (built) and module layout (target)
@@ -431,9 +446,10 @@ src/
                   ArchiveDialog, AccessDenied (see the honesty paragraph below)
   db/             client, rpc, case, doors, door-errors — the ONLY network surface
   domain/         pure types + scoped services, no React:
-                    identity/ (types.ts = the schema mirror, + taxonomy.test.ts)
+                    identity/ (types.ts = the schema mirror)
                     hierarchy/ (organization|property|outlet|department-service.ts)
                     access/   (session|people|role-service.ts)
+                    restaurant/ (menu|floor|order|bill|kot|day-service.ts)
                     audit/    (audit-service.ts)   money/ (money.ts)
   pages/          one screen per live route — FoundationStatusPage (counts the registry), the organization/
                   property/outlet/department hierarchy screens, team (people) + roles (access) + audit, and
@@ -441,7 +457,7 @@ src/
                   CapabilityNote when the session is short of it
   state/          context-store.ts (incl. notices + dismissNotice), tenant-cache.ts (both in-memory, no
                   persistence)
-  lib/            errors.ts, audit.ts   test-helpers/ (SQL parser + Node stub transport)   types/
+  lib/            errors.ts, audit.ts   types/
 ```
 
 Feature modules (`modules/{restaurant,hotel,inventory,finance,…}`) are the target from Prompt #04 onward; they
@@ -464,31 +480,37 @@ Node suite) the store hook returns the **initial** snapshot, not the live one, s
 current session state subscribes with the hook (to re-render on change) but reads the value through
 `useContextStore.getState()` — see the comments in `src/pages/team/TeamPage.tsx` and `AccessDenied.tsx`.
 
-### 13.5 The drift-killing tests
+### 13.5 The drift-killing tests — DELETED, and what that costs
 
-`src/test-helpers/migrations.ts` parses `db/supabase/*.sql` at test time — no generated types, no hand-copied
-list — and three suites diff the client against that live SQL **in both directions**:
+This section used to describe four TypeScript suites that parsed `db/supabase/*.sql` at test time (via
+`src/test-helpers/migrations.ts`) and diffed the client against the live SQL **in both directions**:
 
 - `doors.test.ts` — the `CLIENT_DOORS` list vs the functions actually defined in `public` (unlisted /
-  removed / duplicate), every door parameter on the `p_*` convention, and the boot-critical signatures
-  (`resolve_active_context` takes no arg, `my_permissions` takes `p_organization/p_property/p_outlet`).
+  removed / duplicate), every door parameter on the `p_*` convention, and the boot-critical signatures.
 - `door-errors.test.ts` — the `DOOR_ERRORS` map covers every `NIVAAS_*` token the SQL raises (and holds no
   copy for a token that no longer exists), uses only declared codes, and never leaks a token into user copy.
 - `taxonomy.test.ts` — every client status/taxonomy array vs the CHECK constraint it mirrors, **and the
-  permission vocabulary the UI gates on**. `clientPermissionTokens()` (in `src/test-helpers/migrations.ts`)
-  scrapes every `domain.verb` string literal out of `src/` — skipping test files, the test helpers, the
-  `nav.` i18n label keys and comments — and diffs them against the permissions `006_seed_rbac.sql` actually
-  seeds. `Permission` is typed `${string}.${string}`, so a token the database never created compiles, ships,
-  and gates a control no grant can ever satisfy; the diff turns that silently-disabled-forever button into a
-  red test. (This build actually grew one such token before the gate caught it.) A companion assertion checks
-  the scrape itself is non-empty, so a broken scraper cannot pass vacuously.
+  permission vocabulary the UI gates on**: `clientPermissionTokens()` scraped every `domain.verb` string
+  literal out of `src/` and diffed it against what `006_seed_rbac.sql` actually seeds. `Permission` is typed
+  `${string}.${string}`, so a token the database never created compiles, ships, and gates a control no grant
+  can ever satisfy.
+- `routes.test.ts` — `ROUTES` vs the `navigation.ts` registry, both directions.
 
-The rule they enforce is simple and load-bearing: **a picker can never offer a value the database's CHECK
-would refuse**, a client can never call a door the schema does not define, and a control can never gate on a
-permission the seed does not grant. That is exactly how the donor project's role matrix drifted and produced a
-UI that offered what the DB refused. A separate suite keeps the *menu* honest against the *router*:
-`src/app/routes.test.ts` diffs `ROUTES` and the `navigation.ts` registry both directions, so a live nav row
-never points at no route and an unroutable screen never ships as dead code in the bundle.
+**All of them, and `src/test-helpers/`, were deleted on 2026-10-07 by owner instruction** ("no test cases, ever
+again; delete every test file written so far"), together with the `test` script in `package.json`. They are
+named here as a record of what the architecture once enforced, not as anything a reader can run.
+
+What still holds, without a test runner: the SQL guards the *database* side of each invariant by itself —
+every migration ends in a self-check block that raises `NIVAAS_MIGRATION_GAP` if the doors, grants, policies,
+indexes, triggers and vocabularies it just created are not actually in the catalogue, and `006`/`013`
+self-check their own permission counts. `db/verify/tenant_isolation.sql` then attacks the same surface from
+outside, as `authenticated`, against a real server.
+
+What is now **unenforced**: nothing diffs the client against the SQL. A `src/db/doors.ts` entry naming a door
+that does not exist, a `DOOR_ERRORS` copy for a retired token, a dropdown value no CHECK accepts, a control
+gated on a permission nobody seeded, or a nav row pointing at no route will compile, ship, and fail only at run
+time. That is precisely the drift the donor project's role matrix produced. **The gap is open by instruction,
+not by oversight** — see `docs/ACCEPTANCE-04.md` §6 and the closing list of this document.
 
 ---
 
@@ -512,8 +534,9 @@ never points at no route and an unroutable screen never ships as dead code in th
   trigger refuses a write whose ancestors disagree, raising `NIVAAS_SCOPE_MISMATCH`.
 - Migrations are numbered, idempotent, forward-only, and recorded in `app.schema_migrations` so a re-run
   skips what landed instead of half-applying twice; the schema is never hand-edited in production.
-- **The taxonomy is the CHECK, and the CHECK is tested against the client** (§13.5) rather than codegen'd
-  from live `information_schema` into casts — this stage validates the enum value lists directly.
+- **The taxonomy is the CHECK, and the CHECK used to be tested against the client** (§13.5 — that diff is
+  deleted, so the pairing is now maintained by hand and only the SQL side still self-checks) rather than
+  codegen'd from live `information_schema` into casts — this stage validates the enum value lists directly.
 - **No giant JSON documents.** `business_hours`, audit `before`/`after` and `metadata` are the only JSON
   columns and they hold genuinely flexible shape; amounts, quantities and state machines stay in typed
   columns. That will matter most when money lands (it does not exist yet).
@@ -524,37 +547,43 @@ never points at no route and an unroutable screen never ships as dead code in th
 
 ## 15. Testing foundation
 
-**IMPLEMENTED:** two proof layers, plus a green typecheck and production build — as of Prompt #02, extended by
-Prompt #03's security substrate.
+**Two proof layers remain — the SQL verifier, and a green typecheck + production build. The client test suite
+no longer exists**, deleted on 2026-10-07 by owner instruction; see §13.5 for what that removes from the
+architecture's enforcement.
 
-- **Client suite** — `npx vitest run`, run in Node (no jsdom; the render tests use `react-dom/server`'s
-  `renderToStaticMarkup`, so effects never fire). It covers money exactness, error sanitisation, the
-  identity/permission type contract, the context store and tenant-cache
-  isolation, the §30 address-bar context sync, the route↔navigation registry, the access-denied reason model,
-  every scoped service and the built hierarchy/people/roles/audit/onboarding screens, the shared UI primitives,
-  and the drift tests of §13.5 — including the client permission-token scrape that fails the suite on a
-  capability the seed never granted. Prompt #03 added the pure client access mirror `authorize.test.ts`, the
-  email-link-only `auth-service.test.ts` (asserts the wire never carries `signInWithPassword`) and extended
-  `permissions.test.ts`, `door-errors.test.ts` and `doors.test.ts` to the new keys, tokens and doors. The stub
-  transport (`src/test-helpers/transport.ts`) replaces the client
-  under the RPC funnel and asserts what reached the wire, and `doorParametersMatchTheSchema` checks those
-  parameters against the migration signatures — so "the test passes" also means "PostgREST would accept the
-  call". The measured total after Prompt #03 and `014` is **51 test files / 721 tests, all passing** (the Prompt
-  #02 snapshot was 41 files / 566 tests). **Prompt #04 adds no tests and nothing has been re-run**: the owner's
-  standing instruction is no tests, no installs, no builds and no verification during the build-out, so that
-  number is a snapshot of where #03 left off, not a current gate.
-- **SQL verifier** — `db/verify/tenant_isolation.sql` (tenant isolation + Prompt #03 hardening + the #04
-  permission ladder and menu domain): **15 scenarios / 195 `PASS` assertions, 0 failures on a cold rebuild**.
+- **Client suite — DELETED.** `npx vitest run` was the #02/#03 proof layer: money exactness, error
+  sanitisation, the identity/permission type contract, the context store and tenant-cache isolation, the §30
+  address-bar context sync, the route↔navigation registry, the access-denied reason model, every scoped
+  service, the built screens, the shared UI primitives, the §13.5 drift tests, plus Prompt #03's
+  `authorize`/`auth-service`/`permissions`/`door-errors`/`doors` suites — **51 files / 721 tests** at its last
+  measured run (a Prompt #03-era snapshot; Prompt #04 was built without adding or re-running any of it). All
+  `src/**/*.test.ts(x)`, `src/test-helpers/` and the `test` script in `package.json` are gone; `vitest` is still
+  listed in `devDependencies` as an unused entry, and nothing runs it. Nothing in the
+  repository now asserts anything about the TypeScript half of the system.
+- **SQL verifier** — `db/verify/tenant_isolation.sql` (tenant isolation + Prompt #03 hardening + Prompt #04's
+  permission ladder, menu domain, restaurant floor and the whole restaurant money path): **twenty scenarios /
+  742 `PASS` assertions, 0 failures**, the last recorded cold run of `000`–`019` being
+  `db/harness/local-pg.sh rebuild` on 2026-10-08 against PostgreSQL 18.3, which ended with
+  `ALL SCENARIOS PASSED`. This file, together with each migration's own self-check block, is now the proof
+  layer: nothing on the client side is.
   Scenarios 1–9 are the Prompt #02 isolation bar; 10–14 are the Prompt #03 proofs (10 = the account gate `008`,
   11 = privilege escalation `009`, 12 = outcomes in the trail `010`, 13 = a custom tenant role `011`,
-  14 = the invitation lifecycle `012`); 15 is Prompt #04's — the restaurant permission ladder, the cross-tenant
-  menu door refusal and the exact-decimal money constraints on `menu_item_prices`. It exercises the isolation
-  bar under the `authenticated` role only (writes are seeded as superuser because migration-time seeds have no
+  14 = the invitation lifecycle `012`); 15 is Prompt #04's menu half — the restaurant permission ladder, the
+  cross-tenant menu door refusal and the exact-decimal money constraints on `menu_item_prices`; 16 is its floor
+  half (`015`: the two-level floor, a table status derived from live orders rather than painted by a screen,
+  the reorder and retirement rules, the NOT_FOUND tenant wall); 17 covers `016` (orders, lines, money and the
+  order machine, including document numbering); 18 covers `017` (the calculation engine, the bill and the five
+  tender doors, with the frozen-at-open snapshots and payment immutability); 19 covers `018` (kitchen order
+  tickets — the fire and ticket ladders, the replay index and reprint auditing); 20 covers `019`
+  (`restaurant_day_overview` — the outlet's trading day answered in ONE read). Scenarios 15–20 are therefore the
+  coverage of Prompt #04's `013`–`019`.
+  It exercises the bar under the `authenticated`
+  role only (writes are seeded as superuser because migration-time seeds have no
   session), and asserts both directions: the valid case is accepted *and* the invalid case is refused with a
   specific `NIVAAS_*` token.
-- **Typecheck + production build** — `npx tsc --noEmit --incremental false` is clean and `npm run build`
-  succeeds, emitting one JS chunk of **756.42 kB** and **27.44 kB** of CSS. That measurement predates the six
-  restaurant screens; neither command has been run since, so both are **NOT_VERIFIED** for `015`–`019`'s client.
+- **Typecheck + production build** — re-measured with the restaurant client in the tree: `npx tsc --noEmit
+  --incremental false` is clean (0 errors across `src`) and `npm run build` succeeds, transforming 2108 modules
+  into one JS chunk of **922.02 kB** (**252.94 kB** gzipped) and **29.77 kB** of CSS (**6.65 kB** gzipped).
   Vite's chunk-size warning fires on
   that single bundle; route-level lazy code-splitting was **deliberately not done in this stage** — one honest
   number is easier to revisit when the operational modules land than a premature split.
@@ -563,29 +592,41 @@ A green typecheck is not a gate on financial correctness. Future layers (integra
 contract, E2E for money- and stock-critical workflows) arrive with those modules.
 
 **Not yet exercised (no proof behind these yet, do not read as done):**
-- **`015`–`019` and the whole restaurant client.** Five migrations (29 doors, seven tables and one view) and six
-  screens exist as written code: no harness apply past `014` is recorded, no `db/verify` scenario touches
-  `orders`, `bills`, `payments`, `order_items`, `kitchen_order_tickets` or `restaurant_day_overview`, and no
-  restaurant screen has been loaded in a browser. `docs/ACCEPTANCE-04.md` is the per-clause record.
-- **`db/verify` has never run against the hosted project.** The hosted apply *has* happened — `000`–`014` on the
-  AMRUT NIVAAS Supabase project, then re-read as 20/20 RLS tables, 50 doors and zero unprotected tables, with an
+- **The restaurant's six screens.** The server-side money path is no longer the gap: `016`–`019` are applied on
+  both servers, each ends in a self-check that passed, and verifier scenarios 17–20 attack orders, order items,
+  bills, payments, `kitchen_order_tickets` and `restaurant_day_overview` — so the totals engine, the payment
+  immutability wall, the KOT replay index and the single day read now have external assertions. What is
+  **NOT_TESTED** is the client half of that sentence: no restaurant screen has been loaded in a browser, so
+  nothing proves a screen calls the right door, renders a money string unchanged, or gates on a seeded
+  permission. `docs/ACCEPTANCE-04.md` is the per-clause record.
+- **Nothing on the client side is proven.** With the suite deleted there is no automated check that a service
+  calls a door that exists, that a money string stays a string across the wire, or that a screen gates on a
+  permission the seed grants. The remaining evidence for those claims is this document plus a typecheck.
+- **`db/verify` has never run against the hosted project.** The hosted apply *has* happened — `000`–`019` on the
+  AMRUT NIVAAS Supabase project, then re-read as **29/29 RLS tables, 79 doors and zero unprotected tables**, with an
   anonymous read of `menus` refused (401) and an anonymous `create_menu` refused by the door itself
-  (`NIVAAS_NO_SESSION`). What is NOT done is the 195-assertion scenario file against it: the harness deliberately
-  refuses to run `db/verify` hosted, so the hosted posture is verified structurally, not behaviourally.
-- **End-to-end browser data flow** — PostgREST is not installed in the local harness, and the hosted project has
-  not been driven from a browser in this session (**NOT_TESTED**). Without project keys the app boots into its
-  honest `unconfigured` state — the shell header reads "No data plane" (`ContextSwitcher.triggerLabel`), and any
+  (`NIVAAS_NO_SESSION`). What is NOT done is the 742-assertion scenario file against it: the harness deliberately
+  refuses to run `db/verify` hosted (it truncates `audit_log` and seeds superuser fixtures), so the hosted
+  posture is verified structurally, not behaviourally.
+- **End-to-end browser data flow** — driven once, on 2026-10-08, against the built `dist/` at a 413px viewport:
+  `/menu`, `/tables`, `/pos`, `/billing`, `/kitchen`, `/restaurant`, `/organization`, `/team`, `/` and an unknown
+  route all fall back to `/sign-in`, the console stayed empty and nothing overflowed. That is the guard working,
+  not the data plane: PostgREST is not installed in the local harness, so no signed-in screen state has ever
+  rendered (**NOT_TESTED** — `docs/ACCEPTANCE-04.md` §4 and §6.10). Without project keys the app instead boots
+  into its honest `unconfigured` state — the shell header reads "No data plane" (`ContextSwitcher.triggerLabel`), and any
   gated screen falls back to the `no-data-plane` AccessDenied wording rather than inventing a denial.
 - **A real emailed sign-in link and delivered invitation** — the auth *code* exists: `src/db/client.ts:56`
   runs `persistSession/autoRefreshToken/detectSessionInUrl: true`, `auth-service.ts` signs in with
-  `signInWithOtp` (email link only, D-32), `010` records `sign_in`/`sign_out` and stamps `last_login_at`, and the
-  session-sync/`bootstrap` path is unit-tested. The remaining blocker is configuration, not code: the hosted
+  `signInWithOtp` (email link only, D-32), `010` records `sign_in`/`sign_out` and stamps `last_login_at`; the
+  session-sync/`bootstrap` path was unit-tested before the suite was deleted and has not been re-exercised
+  since. The remaining blocker is configuration, not code: the hosted
   project has **no SMTP transport** (`smtp_host` null) and `site_url` still defaults to `http://localhost:3000`,
   so a magic link could neither be sent nor land on the app. Invitation *accept* door logic is proven in the
   verifier (scenarios 8 and 14); the delivery hop is the unproven link. The acting user in the local harness
   remains the seeded dev user from `007`.
-- **§57–§59 cache/state isolation is TypeScript-only** — proven in `src/state/tenant-cache.test.ts`, asserted
-  as NOT covered by the SQL verifier.
+- **§57–§59 cache/state isolation is now asserted nowhere.** It was a TypeScript concern proven in
+  `src/state/tenant-cache.test.ts` and `src/state/context-store.test.ts`; both files are deleted, so the claim
+  now rests on the code and this document alone — and it is, as always, NOT covered by the SQL verifier.
 
 ---
 

@@ -53,7 +53,9 @@ export const DENIAL_MESSAGES: Readonly<Record<AccessDenialReason, string>> = {
 /**
  * Door refusals are single-token errors raised by the migrations (005's
  * conventions block). They belong in logs and developer consoles — §39/§63 keep
- * them out of user-facing copy, and `authorize.test.ts` enforces that on every
- * denial sentence above.
+ * them out of user-facing copy. `authorize.test.ts` used to assert that on every
+ * denial sentence below; the suite is deleted, so §39/§63 are held here by review
+ * and the only mechanical backstop is that this table is keyed by the token, never
+ * by database text.
  */
 export const INTERNAL_ERROR_TOKEN_PREFIX = "NIVAAS_" as const;

@@ -270,9 +270,10 @@ begin
   -- redirected by a hostile `public` schema in the session path.
   select p.prosecdef into v_def from pg_proc p where p.oid = v_oid;
   perform app.require_valid(v_def = 'true', 'NIVAAS_MIGRATION_GAP');
+  -- Postgres stores the setting as `search_path=""`, which is what a `set search_path = ''` becomes
+  -- in proconfig; both empty spellings are accepted because the fact being asserted is emptiness.
   perform app.require_valid(
-    (select coalesce(nullif(p.proconfig, '{}'), '{search_path=}')::text[]
-        @> array['search_path=']
+    (select p.proconfig && array['search_path=""', 'search_path=']
        from pg_proc p where p.oid = v_oid),
     'NIVAAS_MIGRATION_GAP');
 

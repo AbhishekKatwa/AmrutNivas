@@ -306,9 +306,12 @@ begin
   v_org := (v_order->>'organization_id')::uuid;
   v_out := (v_order->>'outlet_id')::uuid;
 
-  if jsonb_typeof(p_item_ids) <> 'array' or jsonb_array_length(p_item_ids) = 0 then
-    raise exception 'NIVAAS_KOT_EMPTY' using hint = null;
-  end if;
+  -- A KOT of nothing is a domain refusal, not an empty piece of paper. It goes through the house
+  -- helper like every other door answer: `RAISE ... USING hint = null` is not legal PL/pgSQL, and
+  -- an illegal option would surface as an internal error instead of NIVAAS_KOT_EMPTY.
+  perform app.require_valid(jsonb_typeof(p_item_ids) = 'array'
+                            and jsonb_array_length(p_item_ids) > 0,
+                            'NIVAAS_KOT_EMPTY');
 
   for v_elem in select * from jsonb_array_elements(p_item_ids) loop
     select to_jsonb(oi) into v_line

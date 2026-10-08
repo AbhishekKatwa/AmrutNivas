@@ -412,7 +412,7 @@ export function draftCreateInput(draft: Draft, outletId: EntityId): NewOrder {
     outletId,
     orderType: draft.orderType,
     lines: draft.lines.map(draftLineInput),
-    tableId: orderTypeNeedsTable(draft.orderType) ? draft.tableId : undefined,
+    tableId: orderTypeNeedsTable(draft.orderType) ? (draft.tableId ?? undefined) : undefined,
     notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
     idempotencyKey: draft.idempotencyKey,
   };

@@ -594,13 +594,14 @@ type ItemSheetMode =
   | { kind: "new"; categoryId: string | null }
   | { kind: "edit"; item: MenuItem };
 
-/** The four things on this screen that retire rather than delete, each needing a reason. */
-type RetireTarget =
-  | { kind: "menu"; name: string }
-  | { kind: "category"; name: string }
-  | { kind: "item"; name: string }
-  | { kind: "group"; name: string }
-  | { kind: "modifier"; name: string };
+/** The five things on this screen that retire rather than delete, each needing a reason. */
+type RetireTarget = { id: string; name: string } & (
+  | { kind: "menu" }
+  | { kind: "category" }
+  | { kind: "item" }
+  | { kind: "group" }
+  | { kind: "modifier" }
+);
 
 export default function MenuPage() {
   const status = useContextStore((s) => s.status);
@@ -752,13 +753,13 @@ export default function MenuPage() {
       if (retiring.kind === "menu" && menu !== null) {
         await setMenuStatus({ menuId: menu.id, status: "ARCHIVED", reason });
       } else if (retiring.kind === "category") {
-        await archiveMenuCategory(idOf(retiring), reason);
+        await archiveMenuCategory(retiring.id, reason);
       } else if (retiring.kind === "item") {
-        await archiveMenuItem(idOf(retiring), reason);
+        await archiveMenuItem(retiring.id, reason);
       } else if (retiring.kind === "group") {
-        await archiveModifierGroup(idOf(retiring), reason);
+        await archiveModifierGroup(retiring.id, reason);
       } else {
-        await archiveModifier(idOf(retiring), reason);
+        await archiveModifier(retiring.id, reason);
       }
       setRetiring(null);
       setActionError(null);
@@ -864,7 +865,7 @@ export default function MenuPage() {
               variant="ghost"
               icon={<Archive className="size-4" aria-hidden />}
               onClick={() =>
-                setRetiring({ kind: "item", id: item.id, name: item.name } as RetireTarget)
+                setRetiring({ kind: "item", id: item.id, name: item.name })
               }
             >
               Archive
@@ -988,7 +989,7 @@ export default function MenuPage() {
                         variant="ghost"
                         icon={<Archive className="size-4" aria-hidden />}
                         onClick={() =>
-                          setRetiring({ kind: "menu", id: menu.id, name: menu.name } as RetireTarget)
+                          setRetiring({ kind: "menu", id: menu.id, name: menu.name })
                         }
                       >
                         Archive
@@ -1112,7 +1113,7 @@ export default function MenuPage() {
                             kind: "category",
                             id: section.category!.id,
                             name: section.category!.name,
-                          } as RetireTarget)
+                          })
                         }
                       />
                     ))}
@@ -1246,19 +1247,13 @@ const RETIRE_CONSEQUENCES: Record<RetireTarget["kind"], readonly string[]> = {
   ],
 };
 
-/** A retire target carries its row id beside the label the dialog shows. */
-type Identified = RetireTarget & { id: string };
-
-function idOf(target: Identified): string {
-  return target.id;
-}
-
 /* ---------------------------------------------------------------- sub-pieces */
 
 function MenuSection({
   section,
   rank,
   ranks,
+  firstVisible,
   columns,
   canEdit,
   canArchive,
@@ -1554,7 +1549,7 @@ function ItemSheet({
   const editing = mode.kind === "edit";
   const item = mode.kind === "edit" ? mode.item : null;
   const [draft, setDraft] = useState<ItemDraft>(
-    item !== null ? itemDraftFrom(item) : newItemDraft(mode.categoryId),
+    mode.kind === "edit" ? itemDraftFrom(mode.item) : newItemDraft(mode.categoryId),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
@@ -1883,7 +1878,7 @@ function OptionsSheet({
   canEdit: boolean;
   canArchive: boolean;
   onClose: () => void;
-  onRetire: (target: Identified) => void;
+  onRetire: (target: RetireTarget) => void;
   onChanged: () => void;
 }) {
   const [groups, setGroups] = useState<ModifierGroup[] | null>(null);

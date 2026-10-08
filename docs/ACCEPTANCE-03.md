@@ -12,11 +12,22 @@ Reproduce every gate with:
 
 ```
 npx tsc --noEmit --incremental false      # clean
-npx vitest run                            # 51 files / 721 tests
+npx vitest run                            # NOT_RUN — DELETED. This gate ran 51 files / 721 tests at acceptance;
+                                          # the owner then ordered every test file deleted (2026-10-07,
+                                          # "no test cases, ever again"). The deletion is executed: zero
+                                          # *.test.ts / *.test.tsx remain under src/, src/test-helpers/ is gone,
+                                          # package.json no longer carries a test script, and vitest survives
+                                          # only as an unused devDependencies entry.
 npm run build                             # 756.42 kB JS + 27.44 kB CSS
-./db/harness/local-pg.sh rebuild          # 15 scenarios / 195 PASS assertions, 0 failures (PG 18.3)
+./db/harness/local-pg.sh rebuild          # live: twenty scenarios against a real PostgreSQL 18.3 cluster
+                                          # (15 scenarios / 195 PASS assertions at acceptance)
 node db/harness/remote-apply.mjs check    # hosted posture: 20/20 RLS tables, 50 doors, 0 unprotected
 ```
+
+Every `*.test.ts` / `*.test.tsx` citation below is a historical record of what was exercised at the time of
+writing, not live evidence. Rows whose proof was only a deleted TypeScript test are restated as `NOT_TESTED`
+or re-based on the SQL verifier (`db/verify/tenant_isolation.sql`), the migration self-checks, source
+references, and the compiler.
 
 ---
 
@@ -27,38 +38,38 @@ node db/harness/remote-apply.mjs check    # hosted posture: 20/20 RLS tables, 50
 | Criterion | Proven by | Status |
 | --- | --- | --- |
 | Existing authentication understood and hardened | §1 read-first pass recorded in `docs/SECURITY.md` §2; `008_identity_hardening.sql` re-cuts `profiles.status` to the vocabulary the doors actually check, backfills a profile for every identity, and makes a missing profile refuse closed (`NIVAAS_PROFILE_MISSING`). Verifier scenario 10 | PASS |
-| Sessions handled safely | `src/db/client.ts:56` — `persistSession/autoRefreshToken/detectSessionInUrl: true` (D-31 supersedes #02's `false` flags); `src/domain/auth/session-config.ts` + `auth-service.ts:79` sign in with `signInWithOtp` only; the actor is resolved server-side from `auth.uid()` in every door, never from an argument. `auth-service.test.ts` (21) asserts the wire never carries `signInWithPassword`. Against a live GoTrue: **NOT_TESTED** — see §3 | PASS in code, NOT_TESTED over HTTP |
-| Logout works correctly | `auth-service.ts:118` calls `signOut`, clears the tenant-scoped cache and records a `sign_out` session event through `010`'s `record_auth_event`; asserted in `auth-service.test.ts` and `src/state/tenant-cache.test.ts` (9) | PASS at the service level; no browser round trip (NOT_TESTED) |
-| Suspended users rejected | Scenario 6 + scenario 10; the ladder emits `ACCOUNT_SUSPENDED`; `security-matrix.test.ts` `shouldRejectSuspendedMembership()` | PASS |
-| Removed users rejected | Scenario 6 (grants revoked while the login survives); `NO_ACTIVE_MEMBERSHIP`; `shouldRejectRemovedMembership()`; `people-service.test.ts` (26) | PASS |
+| Sessions handled safely | `src/db/client.ts:56` — `persistSession/autoRefreshToken/detectSessionInUrl: true` (D-31 supersedes #02's `false` flags); `src/domain/auth/session-config.ts` + `auth-service.ts:79` sign in with `signInWithOtp` only; the actor is resolved server-side from `auth.uid()` in every door, never from an argument. `auth-service.test.ts` asserted the wire never carries `signInWithPassword`; that suite is deleted — the claim is code reading only, NOT_TESTED. Against a live GoTrue: **NOT_TESTED** — see §3 | PASS in code (wire assertion NOT_TESTED), NOT_TESTED over HTTP |
+| Logout works correctly | `auth-service.ts:118` calls `signOut` and `010`'s `record_auth_event` exists in the applied SQL; the cache-clear and `sign_out` event recording were asserted in the deleted `auth-service.test.ts` and `src/state/tenant-cache.test.ts` — service level now code reading only, **NOT_TESTED** | NOT_TESTED (no SQL or browser evidence; source only) |
+| Suspended users rejected | Scenario 6 + scenario 10 in `db/verify/tenant_isolation.sql` (live); the ladder emits `ACCOUNT_SUSPENDED`. The client mirror `shouldRejectSuspendedMembership()` lived in the deleted `security-matrix.test.ts` — client half NOT_TESTED | PASS (server side, SQL verifier) |
+| Removed users rejected | Scenario 6 (grants revoked while the login survives) in the live verifier; `NO_ACTIVE_MEMBERSHIP` in the applied SQL; `shouldRejectRemovedMembership()` and `people-service.test.ts` are deleted — client half NOT_TESTED | PASS (server side, SQL verifier) |
 
 ### Multi-tenancy
 
 | Criterion | Proven by | Status |
 | --- | --- | --- |
-| User can belong to multiple organizations | `organization_memberships` unique on `(user_id, organization_id)` (`002`); `resolve_active_context` returns the reachable set and `session-service.test.ts` (17) covers a two-tenant person | PASS |
+| User can belong to multiple organizations | `organization_memberships` unique on `(user_id, organization_id)` (`002`); `resolve_active_context` returns the reachable set. The two-tenant person case was covered by the deleted `session-service.test.ts` — that client coverage is gone; the schema and the SQL function remain | PASS (schema + SQL) |
 | Membership is organization-specific | Scenario 9's per-tenant assertions; `app.member_of` counts exactly one `ACTIVE` row for one organization | PASS |
 | Tenant context is validated | Scenario 5 (a saved context cannot outlive the access that justified it); `set_active_context` re-proves every level and returns `cleared: true` rather than silently narrowing | PASS |
 | Cross-tenant access impossible through normal APIs | Scenarios 1, 3 (guessed foreign uuids refused `NIVAAS_SCOPE_MISMATCH`), 2; hosted: anonymous table read 401, anonymous door call refused `NIVAAS_NO_SESSION` | PASS |
-| Cache/state is tenant-aware | `src/state/tenant-cache.test.ts` (9), `context-store.test.ts` (18) — scope keying plus a generation bump that makes an in-flight fetch from a discarded switch unable to commit. TypeScript-only; asserted NOT covered by the SQL verifier | PASS |
+| Cache/state is tenant-aware | `src/state/tenant-cache.ts` and `src/state/context-store.ts` implement scope keying plus a generation bump that makes an in-flight fetch from a discarded switch unable to commit. The proof was `tenant-cache.test.ts` (9) and `context-store.test.ts` (18); both suites are deleted and this layer was never covered by the SQL verifier — code reading only | **NOT_TESTED** |
 
 ### RBAC
 
 | Criterion | Proven by | Status |
 | --- | --- | --- |
 | Roles centralized | `006_seed_rbac.sql` seeds 13 system roles; `roles` is the only authority and `docs/PERMISSIONS.md` documents what each holds | PASS |
-| Permissions centralized | 54 `domain.verb` tokens in `src/domain/identity/permissions.ts` (measured: 54 distinct keys in `role_permissions`, 13 system roles), diffed both directions against `006` + `011` + `013` in `permissions.test.ts` (12) | PASS |
-| Custom roles architecturally supported | `011_custom_roles.sql` — `create_role`/`update_role`/`set_role_permissions`/`set_role_status`, tenant names scoped per organization (D-40), ceiling and subset guards. `custom-role-service.test.ts` (17), scenario 13 | PASS |
-| Role assignment protected | `009_role_assignment_policy.sql` — no self-grant (`NIVAAS_SELF_ASSIGN_DENIED`), no grant of a permission the grantor lacks, `assign_role`/`revoke_role` require a reason; `role-service.test.ts` (19) | PASS |
-| Privilege escalation prevented | Scenario 11; `grantablePermissions()` mirrors the server ceiling client-side; `security-matrix.test.ts` `shouldPreventPrivilegeEscalation()`; `013` re-proves the same ladder for the restaurant family (`NIVAAS_PERMISSION_LADDER_BROKEN`) | PASS |
+| Permissions centralized | 54 `domain.verb` tokens in `src/domain/identity/permissions.ts` (measured: 54 distinct keys in `role_permissions`, 13 system roles). The both-directions diff against `006` + `011` + `013` was `permissions.test.ts` (12), now deleted — the drift check itself is NOT_TESTED; the counts remain re-measurable from the shipped SQL and source | PASS (SQL + source); drift check NOT_TESTED |
+| Custom roles architecturally supported | `011_custom_roles.sql` — `create_role`/`update_role`/`set_role_permissions`/`set_role_status`, tenant names scoped per organization (D-40), ceiling and subset guards. Scenario 13 in the live verifier. `custom-role-service.test.ts` (17) is deleted — client half NOT_TESTED | PASS (server side, SQL verifier) |
+| Role assignment protected | `009_role_assignment_policy.sql` — no self-grant (`NIVAAS_SELF_ASSIGN_DENIED`), no grant of a permission the grantor lacks, `assign_role`/`revoke_role` require a reason; scenario 11 exercises the ceiling against the live verifier. `role-service.test.ts` (19) is deleted — client half NOT_TESTED | PASS (server side, SQL verifier) |
+| Privilege escalation prevented | Scenario 11 in the live verifier; `grantablePermissions()` (`src/domain/access/custom-role-service.ts:206`) mirrors the server ceiling client-side; `013` re-proves the same ladder for the restaurant family (`NIVAAS_PERMISSION_LADDER_BROKEN`) as a migration self-check. `shouldPreventPrivilegeEscalation()` lived in the deleted `security-matrix.test.ts` — client half NOT_TESTED | PASS (server side, SQL verifier + self-check) |
 
 ### Scope
 
 | Criterion | Proven by | Status |
 | --- | --- | --- |
-| Property access enforced | `app.can_access_property` inside every door + `property_access_denied` in `evaluate_access`; scenario 9; `shouldRejectUnauthorizedPropertyAccess()` | PASS |
-| Outlet access enforced | Same shape one level down; scenario 4 (outlet narrowing inside one tenant) and 9g2; `shouldRejectUnauthorizedOutletAccess()` | PASS |
-| Future department scope possible | `DEPARTMENT` exists in the scope taxonomy and `role_permissions` can carry it, while `assign_role` refuses it with `NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED` rather than half-wiring a resolution `my_permissions` cannot do (D-26). Adding it is one migration, not a rewrite | PASS as a documented, tested refusal — PARTIAL as a capability |
+| Property access enforced | `app.can_access_property` inside every door + `property_access_denied` in `evaluate_access`; scenario 9 in the live verifier. `shouldRejectUnauthorizedPropertyAccess()` lived in the deleted `security-matrix.test.ts` — client half NOT_TESTED | PASS (server side, SQL verifier) |
+| Outlet access enforced | Same shape one level down; scenario 4 (outlet narrowing inside one tenant) and 9g2 in the live verifier; `shouldRejectUnauthorizedOutletAccess()` is deleted with `security-matrix.test.ts` — client half NOT_TESTED | PASS (server side, SQL verifier) |
+| Future department scope possible | `DEPARTMENT` exists in the scope taxonomy and `role_permissions` can carry it, while `assign_role` refuses it with `NIVAAS_DEPARTMENT_GRANTS_UNSUPPORTED` rather than half-wiring a resolution `my_permissions` cannot do (D-26) — the refusal is asserted in the live verifier. Adding it is one migration, not a rewrite | PASS as a documented, SQL-verified refusal — PARTIAL as a capability |
 | Direct API access cannot bypass scope | Scenario 2 (`authenticated` is SELECT-only, DML revoked at grant level in `003`); PostgREST exposes `public` only, so `app.*` guards are unreachable whatever they are granted | PASS |
 
 ### Audit
@@ -66,15 +77,15 @@ node db/harness/remote-apply.mjs check    # hosted posture: 20/20 RLS tables, 50
 | Criterion | Proven by | Status |
 | --- | --- | --- |
 | Important mutations audited | Every write door enters `app.audit()` in the same transaction as its write; scenario 9e and "audit trail recorded the scenario writes" | PASS |
-| Security failures auditable | `010_audit_outcomes.sql` adds the `result` column (`SUCCESS`/`FAILURE`/`DENIED`) and `evaluate_access` — the one non-raising door — writes an `access_denied` row via `app.audit_access`, because a raising door cannot self-audit (D-30). Scenario 12; `shouldAuditAccessDenied()` | PASS |
+| Security failures auditable | `010_audit_outcomes.sql` adds the `result` column (`SUCCESS`/`FAILURE`/`DENIED`) and `evaluate_access` — the one non-raising door — writes an `access_denied` row via `app.audit_access`, because a raising door cannot self-audit (D-30). Scenario 12 in the live verifier. `shouldAuditAccessDenied()` lived in the deleted `security-matrix.test.ts` — client half NOT_TESTED | PASS (server side, SQL verifier) |
 | Audit records append-only | `app.forbid_audit_mutation` refuses UPDATE/DELETE for every role including the owner — `NIVAAS_AUDIT_IMMUTABLE`, asserted in the verifier; `AuditPage` has no edit or clear control | PASS |
-| Audit data exposes no secrets | §68 is enforced at the write: no password, OTP, access/refresh token, session secret, invitation token or payment credential is ever a column or a metadata key — `src/lib/audit.test.ts` (6) and `docs/SECURITY.md` §8 | PASS |
+| Audit data exposes no secrets | §68 is enforced at the write: no password, OTP, access/refresh token, session secret, invitation token or payment credential is ever a column or a metadata key — written against `src/lib/audit.ts` and `docs/SECURITY.md` §8. The enforcing test (`src/lib/audit.test.ts`, 6 cases) is deleted and the SQL verifier does not assert payload contents — code reading only | **NOT_TESTED** |
 
 ### Security
 
 | Criterion | Proven by | Status |
 | --- | --- | --- |
-| No plaintext secrets | `.env` is gitignored (`.gitignore:3`) and holds only `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_URL`, `SUPABASE_ACCESS_TOKEN`; the tracked tree scanned clean for `sbp_`, `sb_secret_`, JWT-shaped and inline service-role literals. The only `sb_secret_` string in the source is a fixture that proves the env gate *refuses* it (`src/config/env.test.ts:83`) | PASS |
+| No plaintext secrets | `.env` is gitignored (`.gitignore:3`) and holds only `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_URL`, `SUPABASE_ACCESS_TOKEN`; the tracked tree scanned clean for `sbp_`, `sb_secret_`, JWT-shaped and inline service-role literals. The evidence is the `.gitignore` and the tracked-tree scan, not a test: the only `sb_secret_` string ever in the source was the fixture in `src/config/env.test.ts:83` proving the env gate *refuses* it, and that file was deleted with the suite on 2026-10-07, so the tracked tree now contains no such fixture at all | PASS (gitignore + tree scan) |
 | No sensitive credentials in source | Same scan; §56's demo credentials were not introduced, and `007` (dev seed) is excluded from every hosted apply by `remote-apply.mjs`. **Caveat, owner-side:** the Personal Access Token used for the applies was pasted into chat and must be revoked — see §5 | PASS for the repository; the token itself is a live risk |
 | No frontend-only authorization | `Can`/`useCan` and `RouteGuard` hide and refuse *before* the call for UX; the same check runs again inside the door (`app.require_permission`), and RLS is the backstop. `authorize.ts` is explicitly documented as a mirror, not a decision-maker | PASS |
 | No cross-tenant data leakage | Scenarios 1, 3, 5, 9 + the tenant-cache generation guard + hosted anonymous refusals | PASS |
@@ -84,21 +95,20 @@ node db/harness/remote-apply.mjs check    # hosted posture: 20/20 RLS tables, 50
 
 | Criterion | Artefact | Status |
 | --- | --- | --- |
-| Authentication tests | `src/domain/auth/auth-service.test.ts` (21) | PASS |
-| Membership tests | `people-service.test.ts` (26), scenario 6 | PASS |
-| Tenant isolation tests | scenarios 1, 2, 3, 5 + `taxonomy.test.ts` (17) | PASS |
-| Property isolation tests | scenario 9, `property-service.test.ts` (15), `shouldRejectUnauthorizedPropertyAccess()` | PASS |
-| Outlet isolation tests | scenarios 4 and 9g2, `outlet-service.test.ts` (15), `shouldRejectUnauthorizedOutletAccess()` | PASS |
-| RBAC tests | `role-service.test.ts` (19), `custom-role-service.test.ts` (17), `permissions.test.ts` (12), scenario 13 | PASS |
-| Owner protection tests | `security-matrix.test.ts` `shouldPreventRemovingLastOwner()`, scenario 13, `memberships_one_owner_idx` | PASS |
-| Audit tests | `audit-service.test.ts` (9), `src/lib/audit.test.ts` (6), `Audit.test.tsx` (18), scenarios 9e/12 | PASS |
-| Cache isolation tests | `tenant-cache.test.ts` (9), `context-store.test.ts` (18) | PASS |
+| Authentication tests | `src/domain/auth/auth-service.test.ts` (21) — deleted 2026-10-07; the email-link-only wire claim is code reading only | **NOT_TESTED** (server-side account gates remain proven by scenarios 6/10) |
+| Membership tests | `people-service.test.ts` (26) — deleted; scenario 6 in the live verifier remains | PASS (server side, SQL verifier) |
+| Tenant isolation tests | `taxonomy.test.ts` (17) — deleted; scenarios 1, 2, 3, 5 in the live verifier remain | PASS (SQL verifier) |
+| Property isolation tests | `property-service.test.ts` (15) — deleted; scenario 9 in the live verifier remains | PASS (SQL verifier) |
+| Outlet isolation tests | `outlet-service.test.ts` (15) — deleted; scenarios 4 and 9g2 in the live verifier remain | PASS (SQL verifier) |
+| RBAC tests | `role-service.test.ts` (19), `custom-role-service.test.ts` (17), `permissions.test.ts` (12) — deleted; scenario 13 in the live verifier remains | PASS (server side, SQL verifier) |
+| Owner protection tests | `security-matrix.test.ts` `shouldPreventRemovingLastOwner()` — deleted; scenario 13 and `memberships_one_owner_idx` in the applied SQL remain | PASS (SQL verifier) |
+| Audit tests | `audit-service.test.ts` (9), `src/lib/audit.test.ts` (6), `Audit.test.tsx` (18) — deleted; scenarios 9e/12 in the live verifier remain | PASS (server side, SQL verifier); client/UI half **NOT_TESTED** |
+| Cache isolation tests | `tenant-cache.test.ts` (9), `context-store.test.ts` (18) — deleted; no SQL or browser evidence exists for this layer | **NOT_TESTED** |
 
-The ten cases §49 names are all present in `src/domain/access/security-matrix.test.ts` by the prompt's own
-method names. Seven are exercised against the real client decision functions; three (`last owner`,
-`role assignment audited`, `access denied audited`) are database-owned decisions, so the test asserts the
-client half that genuinely exists and cites the verifier scenario that proves the server half — it does not
-pretend a Node render test reached Postgres.
+The ten cases §49 names were all present in `src/domain/access/security-matrix.test.ts` by the prompt's own
+method names; that file was deleted on 2026-10-07 with the rest of the suite. The database-owned decisions
+they cited remain exercised by the verifier scenarios (6, 9, 11, 12, 13); the client-side mirrors are now code
+reading only — **NOT_TESTED**.
 
 ---
 
@@ -107,14 +117,14 @@ pretend a Node render test reached Postgres.
 | Gate | Command | Result |
 | --- | --- | --- |
 | Typecheck | `npx tsc --noEmit --incremental false` | **clean** (forced run; the incremental cache is not trusted as a gate) |
-| Lint | — | **NOT_AVAILABLE** — `package.json` has no linter; scripts are `dev`, `build`, `preview`, `typecheck`, `test`. Not suppressed, simply absent; adding one is a separate decision |
-| Unit + contract tests | `npx vitest run` | **51 files / 721 tests, 721 passed** (Prompt #02's bar was 41/566) |
-| Integration tests (SQL) | `./db/harness/local-pg.sh rebuild` | **15 scenarios / 195 `PASS` assertions / 0 failures**, cold rebuild, PostgreSQL 18.3 — "ALL SCENARIOS PASSED" |
+| Lint | — | **NOT_AVAILABLE** — `package.json` has no linter; scripts are `dev`, `build`, `preview`, `typecheck` (the `test` script is gone with the deleted suite). Not suppressed, simply absent; adding a linter is a separate decision |
+| Unit + contract tests | `npx vitest run` | **NOT_RUN** — the suite (then 51 files / 721 tests, all passing at acceptance; Prompt #02's bar was 41/566) was deleted on 2026-10-07 by owner instruction ("no test cases, ever again"). Zero `*.test.ts` / `*.test.tsx` files remain; `vitest` survives only as an unused `devDependencies` entry |
+| Integration tests (SQL) | `./db/harness/local-pg.sh rebuild` | **15 scenarios / 195 `PASS` assertions / 0 failures**, cold rebuild, PostgreSQL 18.3 — "ALL SCENARIOS PASSED". Live: the verifier has since grown to twenty scenarios and remains the primary behavioural evidence |
 | Build | `npm run build` | **✓ built in ~2.3s** — `dist/assets/index-DD93sd_b.js` 756.42 kB (gzip 212.45 kB), CSS 27.44 kB (gzip 6.28 kB). Vite's >500 kB chunk warning still stands; route-level code-splitting is deliberately deferred (see §5) |
-| Drift gates | included above | `doors.test.ts` (8) and `door-errors.test.ts` (12) both directions against the shipped SQL; `permissions.test.ts` (12) across `006` + `011` + `013`; `taxonomy.test.ts` (17) including the client permission-token scrape |
+| Drift gates | included above | **NOT_TESTED** since deletion — `doors.test.ts` (8) and `door-errors.test.ts` (12) both directions against the shipped SQL; `permissions.test.ts` (12) across `006` + `011` + `013`; `taxonomy.test.ts` (17) including the client permission-token scrape — all four were the deleted TypeScript suite's checks, not SQL-verifier scenarios. The drift they guarded against is now re-checkable only by hand or by the compiler |
 | E2E | — | **NOT_TESTED** — no Playwright/Cypress in this repository and no PostgREST in the local harness |
 
-Nothing was hidden to get here: the two drift gates failed loudly when `014` landed 19 unregistered doors and
+Nothing was hidden to get here: the two then-live drift gates failed loudly when `014` landed 19 unregistered doors and
 19 unmapped tokens, and both were fixed by registering the doors and writing copy derived from each actual
 `require_valid` expression rather than by loosening an assertion.
 
@@ -147,7 +157,9 @@ outlet, each narrowed by `property_access`/`outlet_access`, with department deli
 resolves the actor from the session, calls `app.require_permission`, and derives denormalized ancestors from the
 parent row so a client cannot claim a property that is not under the organization it named. `evaluate_access`
 is the same ladder as a *value* rather than an exception, so guards can pre-flight and audit a denial (D-30),
-and `authorize.ts` is its pure mirror — 24 tests in `authorize.test.ts`.
+and `authorize.ts` is its pure mirror — the mirror's 24 tests in `authorize.test.ts` were deleted with the
+suite on 2026-10-07, so client/server agreement is code reading only (NOT_TESTED), while the server ladder
+itself stays verified by scenarios 6, 9, 11 and 13.
 
 ### 3.3 Tenant isolation
 
@@ -173,16 +185,20 @@ write its own refusal. `member_invited`/`accepted`/`cancelled`/`revoked`, `role_
 the reason code, never a secret. `app.forbid_audit_mutation` makes the table append-only for every role
 including the owner, and the verifier asserts the delete attempt is refused.
 
-### 3.5 Security tests added
+### 3.5 Security tests added (then deleted)
 
-`security-matrix.test.ts` (10 — §49's named cases), `authorize.test.ts` (24 — the full denial ladder and every
-`AccountStanding`), `auth-service.test.ts` (21 — email-link-only, sign-out, cache cleared, never
-`signInWithPassword`), `custom-role-service.test.ts` (17 — the four `011` doors and their guards),
-`role-service.test.ts` (19), `people-service.test.ts` (26), `session-service.test.ts` (17),
-`src/app/RouteGuard.test.tsx` (10), `Can.test.tsx` (9), `AccessDeniedScreen.test.tsx` (4),
-`AccessDebugPanel.test.tsx` (4), `src/db/doors.test.ts` + `door-errors.test.ts` (20 combined, both directions),
-plus the SQL half: scenarios 10 (account gate), 11 (privilege escalation), 12 (outcomes in the trail),
-13 (custom tenant role + last-owner), 14 (invitation lifecycle).
+The TypeScript security suites were `security-matrix.test.ts` (10 — §49's named cases), `authorize.test.ts`
+(24 — the full denial ladder and every `AccountStanding`), `auth-service.test.ts` (21 — email-link-only,
+sign-out, cache cleared, never `signInWithPassword`), `custom-role-service.test.ts` (17 — the four `011`
+doors and their guards), `role-service.test.ts` (19), `people-service.test.ts` (26), `session-service.test.ts`
+(17), `src/app/RouteGuard.test.tsx` (10), `Can.test.tsx` (9), `AccessDeniedScreen.test.tsx` (4),
+`AccessDebugPanel.test.tsx` (4), `src/db/doors.test.ts` + `door-errors.test.ts` (20 combined, both directions).
+All of them were deleted on 2026-10-07 under the owner's standing instruction; the delete-tests order is now
+fully executed — zero test files remain, the `test` script is gone from `package.json`, and `vitest` sits in
+`devDependencies` as an unused entry. What survives is the SQL half: scenarios 10 (account gate), 11
+(privilege escalation), 12 (outcomes in the trail), 13 (custom tenant role + last-owner), 14 (invitation
+lifecycle) in the live `db/verify/tenant_isolation.sql`, plus the migration self-check blocks. Everything the
+deleted suites alone proved is **NOT_TESTED**.
 
 ### 3.6 Files changed
 
@@ -218,7 +234,9 @@ applied to the hosted project except dev-only `007`.
 ```
 Typecheck:  clean (npx tsc --noEmit --incremental false)
 Lint:       NOT_AVAILABLE — no linter configured in package.json
-Tests:      51 files / 721 tests passed; SQL verifier 15 scenarios / 195 PASS / 0 FAIL (cold rebuild, PG 18.3)
+Tests:      NOT_RUN — the suite (then 51 files / 721 tests passed) was deleted on 2026-10-07 by owner
+            instruction; zero test files remain. SQL verifier live: 15 scenarios / 195 PASS / 0 FAIL at
+            acceptance (cold rebuild, PG 18.3), now twenty scenarios
 Build:      ✓ npm run build — 756.42 kB JS (gzip 212.45 kB) + 27.44 kB CSS, ~2.3s
 ```
 
@@ -266,10 +284,12 @@ quietly implemented.
 Prompt #03 is closed; the first operational module is now allowed by its own exit gate on the schema side.
 **Prompt #04 — Restaurant Foundation (menu, tables, POS orders, KOT)** is already under way: `013` (the 27
 restaurant permissions) and `014` (the six menu tables and 19 doors) are applied locally and hosted, scenario
-15 attacks them, and 721 tests are green. The remaining #04 work is `015` floors/areas/tables, `016` the order
-state machine, `017` the bill calculation engine and payments, `018` KOT, then the menu/floor/POS/billing/
-dashboard screens and the dev seed. Tax on the bill stays in Phase 1 (D-07, still awaiting owner sign-off);
-the accounting engine and GST returns stay in Phase 4.
+15 attacks them, and 721 tests were green when that sentence was true; the suite was deleted on 2026-10-07,
+so the #04 client side is now NOT_TESTED and the SQL verifier is the only live behavioural gate. The
+remaining #04 work is `015` floors/areas/tables, `016` the order state machine, `017` the bill calculation
+engine and payments, `018` KOT, then the menu/floor/POS/billing/dashboard screens and the dev seed. Tax on
+the bill stays in Phase 1 (D-07, still awaiting owner sign-off); the accounting engine and GST returns stay
+in Phase 4.
 
 Two owner actions unblock the rows above: **configure the hosted SMTP transport and `site_url`** (or accept
 that Phase 0's exit gate cannot be walked by a real person yet), and **revoke the Personal Access Token**.

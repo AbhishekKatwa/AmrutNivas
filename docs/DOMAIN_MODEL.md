@@ -51,10 +51,13 @@ Every shape below is executed as a table and mirrored, field-for-field, in camel
 The services that read/write them are `src/domain/hierarchy/{organization,property,outlet,department}-service.ts`,
 `src/domain/access/{session,people,role}-service.ts` and `src/domain/audit/audit-service.ts`.
 
-**Rule the taxonomy tests enforce:** each status/type/mode/scope list is declared twice — as a type for the
-compiler and as a `const` array the pickers render — and `domain/identity/taxonomy.test.ts` compares each
-array against the `CHECK` constraint in the migration, in both directions. **A picker can therefore never
-offer a value the database's `CHECK` would refuse**, and the client can never name a status the schema does
+**Rule the taxonomy tests used to enforce:** each status/type/mode/scope list is declared twice — as a type for
+the compiler and as a `const` array the pickers render — and `domain/identity/taxonomy.test.ts` compared each
+array against the `CHECK` constraint in the migration, in both directions. That suite is deleted (2026-10-07,
+`docs/ARCHITECTURE.md` §13.5), so the pairing is now maintained by hand and the invariant below is a rule to
+keep, not one a build enforces:
+**a picker must never
+offer a value the database's `CHECK` would refuse**, and the client must never name a status the schema does
 not accept. The donor app's property-type list drifted exactly this way and a write failed at the door.
 
 #### The spine — hierarchy (`db/supabase/001_business_hierarchy.sql`)
@@ -124,9 +127,11 @@ role including the owner. Every door writes through `app.audit()`.
 ### 2.2 Target entities (modules NOT built yet)
 
 The table below is the contract later phases must conform to. Except for the rows marked **IMPLEMENTED** — the
-four menu rows from `014` and the restaurant rows from `015`–`019` — none of these tables or doors exist, and
-the restaurant ones that exist have **not been applied to a database yet** (see `docs/ACCEPTANCE-04.md`); the
-relationships in §3 and the state machines in §4 are canonical *intent* until a harness run says otherwise.
+four menu rows from `014` and the restaurant rows from `015`–`019` — none of these tables or doors exist. The
+restaurant ones are **applied on both servers** (local harness and the hosted project, each migration ending in
+its own catalogue self-check that passed), so the tables, doors, grants and policies are facts; what is not yet
+a fact is their behaviour, which no verifier scenario attacked until this pass (see `docs/ACCEPTANCE-04.md`). The
+relationships in §3 and the state machines in §4 are canonical *intent* until the scenarios say otherwise.
 
 | Domain | Entity | Scope | Meaning and key relationships |
 |---|---|---|---|
@@ -293,5 +298,6 @@ property-close process. **Place of supply** the tax-location rule that decides C
   explicit scale and are never multiplied into a float. (No money table exists yet.)
 - Timestamps are UTC `timestamptz`; date-only business fields are `date`, never a midnight timestamp.
 - **Statuses/types/modes/scopes are `text` columns with a `CHECK (col in (...))` list**, and the client's
-  `const` arrays are diffed against that CHECK by `taxonomy.test.ts` in both directions — so the two cannot
-  drift (the donor app's acknowledged "real risk"). `src/domain/identity/types.ts` is the single mirror.
+  `const` arrays were diffed against that CHECK by `taxonomy.test.ts` in both directions until §13.5 deleted it —
+  so the two are meant to be unable to
+  drift (the donor app's acknowledged "real risk"), and nothing now checks that they haven't. `src/domain/identity/types.ts` is the single mirror.

@@ -1,11 +1,14 @@
 # AMRUT NIVAAS — database migrations
 
 The tenant model, the security substrate and now the restaurant. Nothing here is decorative: every file
-up to `014` was executed against a real PostgreSQL 18.3 and attacked by `db/verify/tenant_isolation.sql`
-(195 assertions, 15 scenarios) from a cold cluster before it was claimed to work.
-**`015`–`019` have not had that run.** They are written, each closes with its own self-check block, and no
-harness or hosted apply after `014` is recorded for any of them — `docs/ACCEPTANCE-04.md` says so row by row.
-Read them as design until `./db/harness/local-pg.sh rebuild` says otherwise.
+up to `019` was executed against a real PostgreSQL 18.3 and attacked by `db/verify/tenant_isolation.sql`
+(208 assertions, 16 scenarios) from a cold cluster before it was claimed to work, and the same set is
+recorded as applied on the hosted AMRUT NIVAAS project (`000`–`019` minus the dev-only `007`: 29/29 tables
+under RLS, 79 `SECURITY DEFINER` doors).
+**What that does not buy is behaviour.** `016`–`019` each close with their own self-check block, so they
+exist on both servers with their doors, grants, policies, indexes and triggers counted in the catalogue —
+but no scenario yet opens an order, books a payment, prints a KOT or reads a trading day. Read the
+row-by-row verdicts in `docs/ACCEPTANCE-04.md`.
 
 ## Apply order
 
@@ -103,12 +106,16 @@ twice.
 
 ## What has not been proved
 
-- **`015`–`019`.** Neither the harness nor the hosted project has an apply recorded past `014`, so the entire
-  restaurant substrate — tables, orders, bills, payments, KOTs and the day read — is design plus in-file
-  self-checks. A `rebuild` is the first thing that will tell us whether any of it parses.
-- **No verifier scenario covers a restaurant table.** The 15 scenarios stop at `014`; `bills`, `payments`,
-  `order_items`, `kitchen_order_tickets` and `restaurant_day_overview` have no cross-tenant attack recorded yet.
-- The client's cache/state isolation (§57–§59) is TypeScript, tested in `src/` — but no restaurant screen has
-  been loaded in a browser, and Prompt #04 adds no tests by instruction.
+- **No verifier scenario covers the restaurant's money path.** Scenarios 15 and 16 attack `013`–`015` (the
+  permission ladder, the menu domain, the floor and its derived status). `016`–`019` are applied on both
+  servers and pass their own in-file self-checks, but `orders`, `bills`, `payments`,
+  `kitchen_order_tickets` and `restaurant_day_overview` have no cross-tenant or door-refusal attack recorded
+  yet — the totals engine, the payment immutability wall and the KOT replay index are asserted by nobody.
+- **The hosted apply is structural, not behavioural.** `remote-apply.mjs check` re-reads the ledger, the RLS
+  census and the door count; `db/verify/tenant_isolation.sql` deliberately never runs against the hosted
+  project because it truncates `audit_log` and seeds superuser fixtures.
+- **No restaurant screen has been loaded in a browser**, and Prompt #04 adds no client tests by instruction —
+  the suite that covered §57–§59 cache isolation and the client↔SQL drift gates was deleted; see
+  `docs/ARCHITECTURE.md` §13.5.
 - **The printing decision (O-1) is still open**, and KOT without a print path is a queue on one screen rather
   than a ticket in a kitchen.

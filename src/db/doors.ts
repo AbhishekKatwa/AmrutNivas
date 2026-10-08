@@ -4,10 +4,12 @@
  *
  * PostgREST exposes every function in `public`, so this is not how the surface is
  * enforced (the schema split in 005 is). It is how the *client* is kept honest:
- * `db/doors.test.ts` compares this array against the functions actually defined in
+ * `db/doors.test.ts` compared this array against the functions actually defined in
  * `db/supabase/*.sql`, in both directions, so a door added server-side without a
  * service method — or a service method calling a door that was renamed away —
- * fails the test suite instead of the user.
+ * failed a build instead of surprising the user. That test was deleted with the
+ * suite (2026-10-07, owner instruction), so this list is now kept in step by hand
+ * and a drift surfaces as PostgREST's "function does not exist", on screen.
  */
 export const CLIENT_DOORS = [
   // hierarchy

@@ -11,9 +11,12 @@ ladder — is in [SECURITY.md](./SECURITY.md).
 `db/supabase/011_custom_roles.sql` — 27 for Prompt #03 — plus the 27 restaurant tokens seeded by
 `db/supabase/013_restaurant_permissions.sql` (which self-checks its own count *and* the resulting total
 of 54). 54 in all. The client labels them in `PERMISSION_CATALOGUE`
-(`src/domain/identity/permissions.ts`) and `permissions.test.ts` re-reads all three SQL files and diffs
-them against that list **in both directions**, so a seed that gains or drops a token fails the build
-instead of shipping a button the doors refuse, or a document naming a capability nobody can grant. The
+(`src/domain/identity/permissions.ts`). `permissions.test.ts` used to re-read all three SQL files and diff
+them against that list **in both directions**; that suite was deleted on 2026-10-07 by owner instruction
+(`docs/ARCHITECTURE.md` §13.5), so the client-vs-SQL diff is now a manual step and only the SQL side still
+self-checks (`006` asserts its own 25, `013` asserts its own 27 and the resulting total of 54). A seed that
+gains or drops a token, or a client entry with no seed behind it, no longer fails a build — it ships as a
+button the doors refuse, or a document naming a capability nobody can grant. The
 answer to "may I?" never comes from this page or from that file — it comes from `my_permissions` /
 `evaluate_access` server-side.
 
@@ -101,8 +104,9 @@ not a bug.
 area below then answers for itself.
 
 All 27 tokens are now named by a real door: `014` menu, `015` floors and tables, `016` orders, `017` bills and
-payments, `018` KOT, `019` the day read. Two caveats the tables below do not change: those five migrations have
-not been applied to a database yet, so the enforcement is written rather than proven; and `bill.discount` and
+payments, `018` KOT, `019` the day read. Those five migrations are applied on the local harness and on the
+hosted project, and each one's own self-check counts the doors that name a token, so the grants exist; what no
+run has yet proved is that the doors refuse the wrong seat, and one caveat stands regardless: `bill.discount` and
 `order.discount` still have **no door behind them** — a role can hold the capability and nothing in the product
 can yet act on it (`docs/ACCEPTANCE-04.md` §6.6).
 
@@ -277,8 +281,10 @@ invariant #7); they are not enforceable yet because those figures do not exist.
 ## Extending the catalogue (for later prompts)
 
 Add a token by seeding it into `role_permissions` in a numbered migration **and** adding the matching
-entry to `PERMISSION_CATALOGUE`, then re-run `permissions.test.ts`. The test is the contract: a token
-in the SQL with no client entry, or a client entry with no SQL, fails the build. New first segments
+entry to `PERMISSION_CATALOGUE`. Until 2026-10-07 the contract was mechanical: `permissions.test.ts` diffed
+the SQL against that list and a token on one side with no twin on the other failed the build. That suite is
+deleted (§13.5), so the pairing is now a manual step the migration's own self-check cannot see — a client
+entry with no SQL behind it compiles, ships, and gates a control no grant can ever satisfy. New first segments
 also extend `PermissionDomain` in `permissions.ts`. Do not invent arbitrary permission patterns — the
 domains present today are `organization · property · outlet · department · restaurant · menu · table ·
 order · kot · bill · payment · user · role · audit · platform`, all on the same `domain.verb` shape.

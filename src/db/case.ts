@@ -47,8 +47,9 @@ const CAMEL_BOUNDARY = /([a-z0-9])([A-Z])/g;
  *
  * `expectedVersion` -> `p_expected_version`. PostgREST binds parameters by name, so
  * a wrong key is not a type error but a runtime "function does not exist" — which
- * is why `db/door-args.test.ts` compares these names against the signatures parsed
- * out of the migration files rather than trusting a comment.
+ * is why `db/door-args.test.ts` used to compare these names against the signatures
+ * parsed out of the migration files rather than trusting a comment. That test is
+ * deleted, so the database is now the only arbiter of a wrong key.
  *
  * `undefined` is dropped so the door's own default applies; `null` is sent, because
  * a door reads an explicit null as "set this column to NULL".

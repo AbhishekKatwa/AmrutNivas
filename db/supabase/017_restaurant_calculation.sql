@@ -72,15 +72,22 @@ begin
   select to_jsonb(o) into v_order from public.orders o where o.id = p_order_id;
   perform app.require_valid(v_order is not null, 'NIVAAS_NOT_FOUND');
 
-  -- Compute subtotal from ACTIVE lines
+  -- Compute subtotal from ACTIVE lines.
+  --
+  -- One jsonb per row, deliberately: `for v_line in select a, b …` would put only the FIRST
+  -- column into the jsonb variable, and `v_line->>'unit_price'` would then read NULL — a ticket
+  -- whose subtotal, tax and grand total are silently NULL. Building the object here is what makes
+  -- the `->>` reads below mean what they look like they mean.
   for v_line in
-    select oi.unit_price::numeric as unit_price,
-           oi.quantity,
-           coalesce((
-             select sum(om.price_adjustment::numeric * om.quantity)
-               from public.order_item_modifiers om
-              where om.order_item_id = oi.id
-           ), 0) as modifier_total
+    select jsonb_build_object(
+             'unit_price',     oi.unit_price::numeric,
+             'quantity',       oi.quantity,
+             'modifier_total', coalesce((
+               select sum(om.price_adjustment::numeric * om.quantity)
+                 from public.order_item_modifiers om
+                where om.order_item_id = oi.id
+             ), 0)
+           )
       from public.order_items oi
      where oi.order_id = p_order_id
        and oi.status = 'ACTIVE'
@@ -99,11 +106,13 @@ begin
   -- not a taxonomy: when a tax module lands it fills the column and this loop starts costing
   -- money without anyone editing the engine (or inventing a rate ladder in a door).
   for v_line in
-    select coalesce(oi.tax_rate, 0) as tax_rate,
-           (oi.unit_price::numeric * oi.quantity
-            + coalesce((select sum(om.price_adjustment::numeric * om.quantity)
-                          from public.order_item_modifiers om
-                         where om.order_item_id = oi.id), 0)) as line_base
+    select jsonb_build_object(
+             'tax_rate',  coalesce(oi.tax_rate, 0),
+             'line_base', oi.unit_price::numeric * oi.quantity
+                          + coalesce((select sum(om.price_adjustment::numeric * om.quantity)
+                                        from public.order_item_modifiers om
+                                       where om.order_item_id = oi.id), 0)
+           )
       from public.order_items oi
      where oi.order_id = p_order_id
        and oi.status = 'ACTIVE'
@@ -123,12 +132,17 @@ begin
   v_rounding := round(v_grand_total) - v_grand_total;
   v_grand_total := round(v_grand_total);
 
+  -- Money is stated at its declared scale. Postgres carries the division's full numeric scale
+  -- (a percentage tax reads as 0.00000000000000000000, and 100.01 × 5.55% as 5.550555), and every
+  -- money column on orders/bills CHECKs `scale(trim_scale(x)) <= 2` — so an amount with a third
+  -- decimal is a row the trigger cannot write. Rounding here, once, at the engine that owns the
+  -- arithmetic, is the only place that is allowed to decide the scale of money.
   return jsonb_build_object(
-    'subtotal', v_subtotal::text,
-    'discount_amount', v_discount::text,
-    'tax_amount', v_tax::text,
-    'service_charge_amount', v_service_charge::text,
-    'rounding_amount', v_rounding::text,
+    'subtotal', round(v_subtotal, 2)::text,
+    'discount_amount', round(v_discount, 2)::text,
+    'tax_amount', round(v_tax, 2)::text,
+    'service_charge_amount', round(v_service_charge, 2)::text,
+    'rounding_amount', round(v_rounding, 2)::text,
     'grand_total', v_grand_total::text
   );
 end;
@@ -217,25 +231,27 @@ comment on column public.orders.grand_total is
 comment on column public.orders.amount_due is
   'The ORDER''s running balance: grand_total minus the money actually received (SUCCESSFUL payments on this order''s non-CANCELLED bills), floored at 0. Recomputed whenever a line changes, so adding a dish after a deposit does not reprint the guest''s whole bill as due. The bill is the printed document and stays frozen at open time — this column is not a restatement of one.';
 
--- Trigger to recalculate totals when lines change
-create or replace function app.recalculate_order_totals()
-returns trigger
+-- ============================================================ recalculation triggers
+--
+-- One arithmetic, two surfaces. `app.recalc_order_money` is the only thing that writes an order's
+-- money columns, and it is called by a trigger on LINES and a trigger on the OPTIONS under a line.
+-- The second trigger is not decoration: an option carries a price, and 016:1155-1163 inserts a
+-- line's option rows AFTER that line, so with a trigger on lines alone the last line's options
+-- never reach the header — the line insert recomputes while no option exists yet, and nothing
+-- re-arms it until another line moves. The ticket would then store 240.00 for 250.00 of food while
+-- the engine, which reads the rows, prices it at 250.00: a printed bill and the order underneath
+-- it disagreeing by exactly the missed option.
+
+create or replace function app.recalc_order_money(p_order_id uuid)
+returns void
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
   v_totals jsonb;
-  v_order_id uuid;
   v_paid numeric;
 begin
-  -- Determine which order to recalculate
-  if TG_OP = 'DELETE' then
-    v_order_id := OLD.order_id;
-  else
-    v_order_id := NEW.order_id;
-  end if;
-
   -- Money already in the till for this order. A CANCELLED bill is excluded on purpose: its
   -- bill is no longer a claim on the guest, so money booked against it must not sit there as
   -- a phantom credit reducing what a live ticket owes — and it must not be silently refunded
@@ -244,11 +260,11 @@ begin
   select coalesce(sum(p.amount), 0) into v_paid
     from public.payments p
     join public.bills b on b.id = p.bill_id
-   where b.order_id = v_order_id
+   where b.order_id = p_order_id
      and p.status = 'SUCCESSFUL'
      and b.status <> 'CANCELLED';
 
-  select app.calculate_restaurant_totals(v_order_id) into v_totals;
+  select app.calculate_restaurant_totals(p_order_id) into v_totals;
   update public.orders
      set subtotal = (v_totals->>'subtotal')::numeric,
          discount_amount = coalesce((v_totals->>'discount_amount')::numeric, 0),
@@ -262,7 +278,45 @@ begin
          -- CHECK being obeyed here rather than a domain refusal: a bill paid to the rupee,
          -- then amended downwards, has a negative balance that is genuinely zero owed.
          amount_due = greatest((v_totals->>'grand_total')::numeric - v_paid, 0)
-   where id = v_order_id;
+   where id = p_order_id;
+end;
+$$;
+
+-- Lines: the trigger reads its own order off the row it fired for.
+create or replace function app.recalculate_order_totals()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_order_id uuid;
+begin
+  if TG_OP = 'DELETE' then
+    v_order_id := OLD.order_id;
+  else
+    v_order_id := NEW.order_id;
+  end if;
+  perform app.recalc_order_money(v_order_id);
+  return null;
+end;
+$$;
+
+-- Options: one row further down the chain, so the order is read through its line.
+create or replace function app.recalculate_option_order_totals()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_order_id uuid;
+begin
+  select oi.order_id into v_order_id
+    from public.order_items oi
+   where oi.id = case when TG_OP = 'DELETE' then OLD.order_item_id
+                      else NEW.order_item_id end;
+  perform app.recalc_order_money(v_order_id);
   return null;
 end;
 $$;
@@ -271,6 +325,11 @@ $$;
 drop trigger if exists order_items_recalc on public.order_items;
 create trigger order_items_recalc after insert or update or delete on public.order_items
   for each row execute function app.recalculate_order_totals();
+
+drop trigger if exists order_item_options_recalc on public.order_item_modifiers;
+create trigger order_item_options_recalc after insert or update or delete
+  on public.order_item_modifiers
+  for each row execute function app.recalculate_option_order_totals();
 
 -- ==================================================================== chain guards
 --
@@ -515,19 +574,34 @@ security definer
 set search_path = ''
 as $$
 begin
-  if OLD.status = 'SUCCESSFUL' and (
-    NEW.amount <> OLD.amount
-    or NEW.method <> OLD.method
-    or NEW.bill_id <> OLD.bill_id
-  ) then
-    raise exception 'NIVAAS_PAYMENT_IMMUTABLE';
+  -- A SUCCESSFUL payment is money that left a guest's hand, so the row is a receipt — and a receipt
+  -- is neither edited nor erased. A refund is #05's own NEW row through its own door, never a
+  -- rewrite of the one that exists.
+  --
+  -- This guard used to compare three columns and call it immutability, which left the two writes
+  -- that actually destroy money reachable: flipping STATUS to FAILED silently removes the row from
+  -- every balance in the schema (017:258-263 sums SUCCESSFUL payments only — the till loses the
+  -- money while the guest's receipt still says it was paid), and DELETE removes the evidence
+  -- outright. Comparing the WHOLE row is the point: a column a later migration adds to `payments`
+  -- is protected the day it lands, instead of the day someone remembers to name it here.
+  if OLD.status = 'SUCCESSFUL' then
+    if TG_OP = 'DELETE' then
+      raise exception 'NIVAAS_PAYMENT_IMMUTABLE';
+    end if;
+    if NEW is distinct from OLD then
+      raise exception 'NIVAAS_PAYMENT_IMMUTABLE';
+    end if;
+  end if;
+
+  if TG_OP = 'DELETE' then
+    return OLD;
   end if;
   return NEW;
 end;
 $$;
 
 drop trigger if exists payments_immutable on public.payments;
-create trigger payments_immutable before update on public.payments
+create trigger payments_immutable before update or delete on public.payments
   for each row execute function app.guard_payment_immutability();
 
 -- ================================================================ RLS
@@ -997,6 +1071,19 @@ begin
 end;
 $$;
 
+-- The other half of granting "by name": everything else in `app` this file created is a helper, and
+-- a helper a client can call is a second, ungated door. Postgres grants a NEW function to PUBLIC, so
+-- `app.calculate_restaurant_totals` — which reads an order by id with NO tenant check, because every
+-- caller made one first — was reachable from a screen: RLS hides a stranger's ticket, `open_bill`
+-- answers NIVAAS_NOT_FOUND for it, and the helper priced it to the rupee anyway. That is §10's
+-- enumeration leak and §2's "the arithmetic is off the client surface" in one statement, and both
+-- are closed by a revoke rather than by a comment. The doors above are SECURITY DEFINER owned by
+-- this role, so they keep calling it.
+revoke all on function app.calculate_restaurant_totals(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function app.recalc_order_money(uuid)
+  from public, anon, authenticated, service_role;
+
 -- ================================================================ self-check
 
 do $$
@@ -1034,7 +1121,34 @@ begin
   perform app.require_valid(
     (select count(distinct tgname) from pg_trigger
       where tgname in ('bills_touch','payments_touch','bills_chain','payments_chain',
-                       'payments_immutable','order_items_recalc')) = 6,
+                       'payments_immutable','order_items_recalc',
+                       'order_item_options_recalc')) = 7,
+    'NIVAAS_MIGRATION_GAP');
+
+  -- ...and BOTH money surfaces re-arm the same arithmetic. A trigger on lines alone leaves an
+  -- option written after its line (016:1155-1163) unpriced in the header, so the order row and the
+  -- document opened from the engine disagree by exactly that option.
+  perform app.require_valid(
+    (select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid
+      join pg_proc p on p.oid = t.tgfoid
+      where c.relname = 'order_item_modifiers' and t.tgname = 'order_item_options_recalc'
+        and p.proname = 'recalculate_option_order_totals') = 1,
+    'NIVAAS_MIGRATION_GAP');
+
+  -- The receipt wall covers ERASURE as well as editing, and that is only visible in the trigger's
+  -- own event list: a BEFORE UPDATE guard leaves `delete from payments` an ordinary statement.
+  perform app.require_valid(
+    (select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid
+      where t.tgname = 'payments_immutable' and c.relname = 'payments'
+        and pg_get_triggerdef(t.oid) like '%DELETE%') = 1,
+    'NIVAAS_MIGRATION_GAP');
+
+  -- The engine is a helper, not a door: no served role may call it (see the revoke above). Asserted
+  -- here because a grant is invisible in the schema — it is only ever a row in pg_proc.
+  perform app.require_valid(
+    not has_function_privilege('authenticated', 'app.calculate_restaurant_totals(uuid)', 'execute')
+    and not has_function_privilege('anon', 'app.calculate_restaurant_totals(uuid)', 'execute')
+    and not has_function_privilege('authenticated', 'app.recalc_order_money(uuid)', 'execute'),
     'NIVAAS_MIGRATION_GAP');
 
   -- ...and pointing at THIS file's guards, paired by name: the trigger names alone would still

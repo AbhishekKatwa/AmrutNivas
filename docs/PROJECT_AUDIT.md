@@ -148,7 +148,10 @@ Established as new code in this task: brand configuration as the single source o
 Tailwind v4 token system with a distinct NIVAAS identity, the application shell with honest
 not-implemented navigation states, the `Organization → Property → Outlet → Department` domain types,
 integer minor-unit money with Indian grouping formatting and drift-free splitting, the standard public
-error model, the `AuditLogEntry` contract, and the testing foundation (vitest) the donor never had.
+error model, the `AuditLogEntry` contract, and the testing foundation (vitest) the donor never had — **since
+dismantled by owner instruction**: every `src/**/*.test.ts(x)` and `src/test-helpers/` was deleted on 2026-10-07
+along with the `test` script (`docs/ARCHITECTURE.md` §13.5), `vitest` remains only as an unused
+`devDependencies` entry, and nothing in the repository now asserts anything about client behaviour.
 
 Deliberately **not** built in this task: POS, PMS, KDS, inventory engine, accounting, GST, HRMS, CRM,
 events, AI, subscription billing, auth implementation, backend/database wiring. See `ROADMAP.md`.

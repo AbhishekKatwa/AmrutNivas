@@ -199,8 +199,9 @@ export async function evaluateAccess(probe: AccessProbe): Promise<AccessVerdict>
 /**
  * The sentence to show for a verdict, or null when the action is allowed.
  *
- * One call site for `DENIAL_MESSAGES` so a screen cannot print a raw reason code — the rule
- * `authorize.test.ts` enforces on the table itself, applied here to the path that reads it.
+ * One call site for `DENIAL_MESSAGES` so a screen cannot print a raw reason code — the
+ * rule `authorize.test.ts` used to enforce on the table itself (that suite is deleted),
+ * applied here to the path that reads it.
  */
 export function accessDenialCopy(verdict: AccessVerdict): string | null {
   return verdict.allowed ? null : denialCopy(verdict.reason);

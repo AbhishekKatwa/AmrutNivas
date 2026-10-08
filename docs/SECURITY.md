@@ -241,9 +241,11 @@ Storage: `role_permissions(role_id, permission)` with `permission` CHECKed by 00
 `src/domain/identity/permissions.ts` — 54 entries: the 25 seeded by `006_seed_rbac.sql:77-92` (which
 self-checks `count(*) = 25`), `role.create` and `role.edit` inserted by `011_custom_roles.sql:62-65`,
 and the 27 restaurant tokens seeded by `013_restaurant_permissions.sql`. Those three files are the
-sources `permissions.test.ts` re-reads and diffs against the TypeScript list in both directions, so a
-seed gaining or dropping a token fails the build rather than shipping a button nobody can press.
-`audit.export` from Prompt #03 §58's example list is **not** implemented — only `audit.view` is seeded.
+sources `permissions.test.ts` used to re-read and diff against the TypeScript list in both directions; that
+suite was deleted on 2026-10-07 by owner instruction (`docs/ARCHITECTURE.md` §13.5). Each migration still
+self-checks its own count, but nothing now diffs the seed against the TypeScript list: a seed gaining or
+dropping a token no longer fails a build, it ships a button nobody can press or a label with no grant behind
+it. `audit.export` from Prompt #03 §58's example list is **not** implemented — only `audit.view` is seeded.
 The restaurant verbs (`restaurant.view`, `menu.*`, `table.*`, `order.*`, `kot.*`, `bill.*`,
 `payment.*`) exist in the catalogue as of `013`; the three-segment names Prompt #04 §5 writes
 (`restaurant.menu.view`) are refused by the 002 CHECK, so `013` documents them flattened one level, the
@@ -293,9 +295,11 @@ are exactly two implementations of it, and they are the same ladder:
   refuses it *records* the denial before returning.
 - **`authorize(facts)`** (`src/domain/access/authorize.ts:64-96`) — a pure client mirror for
   route guards, disabled controls and the access-denied screen. No Supabase, no store, no async;
-  every fact is something the server's own resolvers already answer. `authorize.test.ts` diffs its
-  reason codes against the SQL text, so a renamed or reordered server step breaks a test instead of
-  quietly changing what users see.
+  every fact is something the server's own resolvers already answer. `authorize.test.ts` used to diff its
+  reason codes against the SQL text, so a renamed or reordered server step broke a test instead of quietly
+  changing what users see; that suite was deleted on 2026-10-07 by owner instruction
+  (`docs/ARCHITECTURE.md` §13.5), so **nothing enforces that agreement now** — the mirror is hand-maintained
+  against `010:157-228`, and a renamed or reordered server step silently changes what users see.
 
 | Step | Reason code | Server predicate | Client fact |
 |---|---|---|---|
@@ -492,8 +496,12 @@ Billing, subscription state and support impersonation are **not part of this pro
 
 Prompt #03 §39: a refusal must be structured, single-token, and never database text. Every door
 raises one `NIVAAS_*` token; `src/db/door-errors.ts` is the only place a token becomes an `AppError`
-code + user copy, and `door-errors.test.ts` fails if any token in `db/supabase/*.sql` is unmapped or
-any mapped token is no longer raised. A failure with no token is classified by PostgREST's own
+code + user copy, and `door-errors.test.ts` used to fail the build if any token in `db/supabase/*.sql` was
+unmapped or any mapped token was no longer raised. That suite was deleted on 2026-10-07 by owner instruction
+(`docs/ARCHITECTURE.md` §13.5), so the table's totality over what the SQL can raise is now maintained by hand:
+an unmapped token falls through to the generic refusal and a stale copy sits unused, and no run catches it —
+the SQL half is still visible in the verifier, which asserts the specific token each refusal answers with.
+A failure with no token is classified by PostgREST's own
 SQLSTATE, and everything else falls back to `INTERNAL` with a message written here
 (`door-errors.ts:259-288`; `docs/DECISIONS.md` D-20).
 
@@ -522,8 +530,10 @@ organization." — which is §18's rule that a person is told access *moved*, no
 distinction between no membership, a suspended membership and a retired tenant.
 
 It may **not** display an internal permission key, a `NIVAAS_*` token, a seniority number, a ceiling,
-another person's identity, or a reason whether the probed tenant exists. `authorize.test.ts` enforces
-that no denial sentence contains a permission token or an internal token, and
+another person's identity, or a reason whether the probed tenant exists. `authorize.test.ts` used to enforce
+that no denial sentence contains a permission token or an internal token; that suite is deleted (2026-10-07,
+`docs/ARCHITECTURE.md` §13.5) and nothing else checks the nine sentences, so **this is a live risk kept by hand
+rather than a gate** — adding a token-bearing sentence to `DENIAL_MESSAGES` would ship unchallenged.
 `ACCESS_LOST_REASON_BY_TOKEN` / `accessLostReason()` (`src/domain/auth/session-config.ts:94-112`)
 translate tokens into reason codes so the store can recognise an account-standing state without ever
 rendering the token; an unrecognised `NIVAAS_ACCOUNT_*` standing falls back to the generic
@@ -616,8 +626,10 @@ A RESTAURANT_MANAGER at one outlet tries to record a discount on a bill. This is
 both halves of the model, and it is the shape Prompt #04's restaurant doors will use.
 
 `discount.manage` **is not in the catalogue and is not implemented** — restaurant permission keys arrive
-with Prompt #04, and `permissions.test.ts` would fail the build if this file claimed a token the SQL
-never seeds. So the chain below is written against what the code does today: the malformed-but-shape-
+with Prompt #04, and `permissions.test.ts` used to fail the build if this file claimed a token the SQL
+never seeds; that suite was deleted on 2026-10-07 by owner instruction (`docs/ARCHITECTURE.md` §13.5), so this
+catalogue is now checked against the seeds by hand, not by a build. So the chain below is written against what
+the code does today: the malformed-but-shape-
 correct token is refused at step 0, and the same walk applies verbatim once `discount.manage` exists
 with `domain.verb` shape, because nothing in `evaluate_access` or `authorize()` depends on which
 domain the key names.
@@ -683,10 +695,12 @@ history must call `evaluate_access` before it calls the door; that is a per-modu
    table read refused (401) and an anonymous door call refused by the door itself (`NIVAAS_NO_SESSION`) — see
    `db/harness/remote-apply.mjs check`. What has **not** happened there is a real session: no SMTP transport and
    no `site_url`, so no emailed magic link has ever been delivered or consumed (`docs/DECISIONS.md` O-8), the
-   195-assertion `db/verify` file is local-only by rule, and `007`'s demo estate is deliberately absent. The
+   742-assertion `db/verify` file is local-only by rule, and `007`'s demo estate is deliberately absent. The
    session and invitation models are therefore proven at the SQL and door-funnel level, not over a live GoTrue.
 10. **No PostgREST in the local harness**, so the wire contract between this client and these doors is
-    exercised by the stub transport in `src/db/rpc.ts`'s tests, not by a live HTTP round trip.
+    exercised by neither. It used to be exercised by the stub transport in `src/db/rpc.ts`'s tests
+    (`src/db/rpc.test.ts`), but that file was deleted on 2026-10-07 by owner instruction
+    (`docs/ARCHITECTURE.md` §13.5); the client-side transport path is now **NOT_TESTED** — code reading only.
 11. **`db/harness/remote-apply.mjs` uses the Management API with an operator token, and applies what it is
    told.** It hard-refuses the poultry project's ref and excludes `007` unless `--with-seed` is passed, but an
    applied migration on a hosted project cannot be un-applied by this tool — there is no downgrade path. Applies
