@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.domain_events (
   entity_id        uuid not null,
 
   occurred_at      timestamptz not null default now(),
-  actor_user_id    uuid references public.users(id),
+  actor_user_id    uuid references public.profiles(id),
 
   metadata         jsonb not null default '{}'::jsonb,
 
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   property_id      uuid references public.properties(id),
   outlet_id        uuid references public.outlets(id),
 
-  recipient_user_id uuid references public.users(id),
+  recipient_user_id uuid references public.profiles(id),
 
   -- Notification type: INFO, SUCCESS, WARNING, ERROR, ACTION_REQUIRED.
   type             text not null check (type in ('INFO','SUCCESS','WARNING','ERROR','ACTION_REQUIRED')),
@@ -90,7 +90,7 @@ create index if not exists notifications_created_idx on public.notifications (cr
 CREATE TABLE IF NOT EXISTS public.notification_preferences (
   id               uuid primary key default gen_random_uuid(),
 
-  user_id          uuid not null references public.users(id) on delete cascade,
+  user_id          uuid not null references public.profiles(id) on delete cascade,
 
   -- Event type pattern (e.g. 'HOTEL.RESERVATION_CONFIRMED' or 'HOTEL.*' for all hotel events).
   event_type       text not null,
@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS public.automation_rules (
   status           text not null default 'DRAFT'
                    check (status in ('ACTIVE','INACTIVE','DRAFT')),
 
-  created_by       uuid references public.users(id),
+  created_by       uuid references public.profiles(id),
 
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
@@ -321,11 +321,12 @@ create policy notifications_select on public.notifications
     and (recipient_user_id = app.current_user_id() or recipient_user_id is null)
   );
 
-drop policy if exists notifications_write on public.notifications
-  for all to authenticated
+drop policy if exists notifications_write on public.notifications;
+create policy notifications_write on public.notifications
+  for all
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('notifications.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'notifications.manage')
   );
 
 -- Notification preferences are user-scoped (users manage only their own).
@@ -338,7 +339,7 @@ create policy notification_preferences_select on public.notification_preferences
 
 drop policy if exists notification_preferences_write on public.notification_preferences;
 create policy notification_preferences_write on public.notification_preferences
-  for all to authenticated
+  for all
   with check (user_id = app.current_user_id());
 
 -- Notification templates are org-scoped (or platform-wide if organization_id is null).
@@ -354,10 +355,10 @@ create policy notification_templates_select on public.notification_templates
 
 drop policy if exists notification_templates_write on public.notification_templates;
 create policy notification_templates_write on public.notification_templates
-  for all to authenticated
+  for all
   with check (
     (organization_id = app.current_organization_id() or organization_id is null)
-    and app.has_permission('communications.template.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'communications.template.manage')
   );
 
 -- Communication messages are org-scoped.
@@ -370,10 +371,10 @@ create policy communication_messages_select on public.communication_messages
 
 drop policy if exists communication_messages_write on public.communication_messages;
 create policy communication_messages_write on public.communication_messages
-  for all to authenticated
+  for all
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('communications.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'communications.manage')
   );
 
 -- Automation rules are org-scoped.
@@ -386,10 +387,10 @@ create policy automation_rules_select on public.automation_rules
 
 drop policy if exists automation_rules_write on public.automation_rules;
 create policy automation_rules_write on public.automation_rules
-  for all to authenticated
+  for all
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('automation.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'automation.manage')
   );
 
 -- Automation executions are org-scoped (via rule).
@@ -409,54 +410,40 @@ create policy automation_executions_select on public.automation_executions
 -- 9. NOTIFICATION & AUTOMATION PERMISSIONS
 -- =====================================================================
 
-INSERT INTO public.role_permissions (permission, role, granted_by)
-VALUES
-  -- Notifications
-  ('notifications.view', 'MASTER_ADMIN', 'system'),
-  ('notifications.view', 'ORG_OWNER', 'system'),
-  ('notifications.view', 'PROPERTY_MANAGER', 'system'),
-  ('notifications.view', 'OUTLET_MANAGER', 'system'),
-  ('notifications.manage', 'MASTER_ADMIN', 'system'),
-  ('notifications.manage', 'ORG_OWNER', 'system'),
+with role_permission_matrix(role_name, permission) as (
+  values
+    -- Notifications
+    ('ORG_OWNER', 'notifications.view'),
+    ('PROPERTY_MANAGER', 'notifications.view'),
+    ('ORG_OWNER', 'notifications.manage'),
 
-  -- Notification preferences (all users can manage their own)
-  ('notifications.preference.view', 'MASTER_ADMIN', 'system'),
-  ('notifications.preference.view', 'ORG_OWNER', 'system'),
-  ('notifications.preference.view', 'PROPERTY_MANAGER', 'system'),
-  ('notifications.preference.view', 'OUTLET_MANAGER', 'system'),
-  ('notifications.preference.view', 'EMPLOYEE', 'system'),
-  ('notifications.preference.manage', 'MASTER_ADMIN', 'system'),
-  ('notifications.preference.manage', 'ORG_OWNER', 'system'),
-  ('notifications.preference.manage', 'PROPERTY_MANAGER', 'system'),
-  ('notifications.preference.manage', 'OUTLET_MANAGER', 'system'),
-  ('notifications.preference.manage', 'EMPLOYEE', 'system'),
+    -- Notification preferences
+    ('ORG_OWNER', 'notifications.preference.view'),
+    ('PROPERTY_MANAGER', 'notifications.preference.view'),
+    ('ORG_OWNER', 'notifications.preference.manage'),
+    ('PROPERTY_MANAGER', 'notifications.preference.manage'),
 
-  -- Communications
-  ('communications.view', 'MASTER_ADMIN', 'system'),
-  ('communications.view', 'ORG_OWNER', 'system'),
-  ('communications.manage', 'MASTER_ADMIN', 'system'),
-  ('communications.manage', 'ORG_OWNER', 'system'),
+    -- Communications
+    ('ORG_OWNER', 'communications.view'),
+    ('ORG_OWNER', 'communications.manage'),
 
-  -- Communication templates
-  ('communications.template.view', 'MASTER_ADMIN', 'system'),
-  ('communications.template.view', 'ORG_OWNER', 'system'),
-  ('communications.template.manage', 'MASTER_ADMIN', 'system'),
-  ('communications.template.manage', 'ORG_OWNER', 'system'),
+    -- Communication templates
+    ('ORG_OWNER', 'communications.template.view'),
+    ('ORG_OWNER', 'communications.template.manage'),
 
-  -- Automation
-  ('automation.view', 'MASTER_ADMIN', 'system'),
-  ('automation.view', 'ORG_OWNER', 'system'),
-  ('automation.create', 'MASTER_ADMIN', 'system'),
-  ('automation.create', 'ORG_OWNER', 'system'),
-  ('automation.edit', 'MASTER_ADMIN', 'system'),
-  ('automation.edit', 'ORG_OWNER', 'system'),
-  ('automation.enable', 'MASTER_ADMIN', 'system'),
-  ('automation.enable', 'ORG_OWNER', 'system'),
-  ('automation.disable', 'MASTER_ADMIN', 'system'),
-  ('automation.disable', 'ORG_OWNER', 'system'),
-  ('automation.history.view', 'MASTER_ADMIN', 'system'),
-  ('automation.history.view', 'ORG_OWNER', 'system')
-ON CONFLICT DO NOTHING;
+    -- Automation
+    ('ORG_OWNER', 'automation.view'),
+    ('ORG_OWNER', 'automation.create'),
+    ('ORG_OWNER', 'automation.edit'),
+    ('ORG_OWNER', 'automation.enable'),
+    ('ORG_OWNER', 'automation.disable'),
+    ('ORG_OWNER', 'automation.history.view')
+)
+insert into public.role_permissions (role_id, permission)
+select r.id, m.permission
+from role_permission_matrix m
+join public.roles r on r.name = m.role_name and r.is_system
+on conflict (role_id, permission) do nothing;
 
 -- =====================================================================
 -- 10. NOTIFICATION & AUTOMATION DOORS
@@ -523,7 +510,7 @@ as $$
 declare
   v_result jsonb;
 begin
-  if not app.has_permission('notifications.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'notifications.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -623,7 +610,7 @@ declare
   v_result jsonb;
 begin
   -- Users can only manage their own preferences.
-  if p_user != app.current_user_id() and not app.has_permission('notifications.preference.manage') then
+  if p_user != app.current_user_id() and not app.has_permission(app.current_user_id(), app.current_organization_id(), 'notifications.preference.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -672,7 +659,7 @@ as $$
 declare
   v_result jsonb;
 begin
-  if not app.has_permission('communications.template.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'communications.template.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -707,7 +694,7 @@ as $$
 declare
   v_result jsonb;
 begin
-  if not app.has_permission('communications.template.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'communications.template.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -744,7 +731,7 @@ as $$
 declare
   v_result jsonb;
 begin
-  if not app.has_permission('communications.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'communications.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -780,7 +767,7 @@ as $$
 declare
   v_result jsonb;
 begin
-  if not app.has_permission('automation.create') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'automation.create') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -816,7 +803,7 @@ as $$
 declare
   v_result jsonb;
 begin
-  if not app.has_permission('automation.edit') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'automation.edit') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -844,11 +831,11 @@ security definer
 set search_path = public
 as $$
 begin
-  if p_status = 'ACTIVE' and not app.has_permission('automation.enable') then
+  if p_status = 'ACTIVE' and not app.has_permission(app.current_user_id(), app.current_organization_id(), 'automation.enable') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
-  if p_status = 'INACTIVE' and not app.has_permission('automation.disable') then
+  if p_status = 'INACTIVE' and not app.has_permission(app.current_user_id(), app.current_organization_id(), 'automation.disable') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 

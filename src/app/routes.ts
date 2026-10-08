@@ -38,6 +38,13 @@ import WastagePage from "@/pages/inventory/WastagePage";
 import TransfersPage from "@/pages/inventory/TransfersPage";
 import StockTakesPage from "@/pages/inventory/StockTakesPage";
 import InventoryOverviewPage from "@/pages/inventory/InventoryOverviewPage";
+import PurchasesPage from "@/pages/inventory/PurchasesPage";
+import SuppliersPage from "@/pages/inventory/SuppliersPage";
+import FinanceInvoicesPage from "@/pages/finance/FinanceInvoicesPage";
+import FinancePaymentsPage from "@/pages/finance/FinancePaymentsPage";
+import AccountingPage from "@/pages/finance/AccountingPage";
+import ProfitLossPage from "@/pages/finance/ProfitLossPage";
+import ReportsPage from "@/pages/analytics/ReportsPage";
 import RoomTypesPage from "@/pages/hotel/RoomTypesPage";
 import RoomsPage from "@/pages/hotel/RoomsPage";
 import ReservationsPage from "@/pages/hotel/ReservationsPage";
@@ -73,6 +80,8 @@ import ChannelsPage from "@/pages/commerce/ChannelsPage";
 import QRCodesPage from "@/pages/commerce/QRCodesPage";
 import TableRequestsPage from "@/pages/commerce/TableRequestsPage";
 import CommerceSettingsPage from "@/pages/commerce/CommerceSettingsPage";
+import OrdersPage from "@/pages/commerce/OrdersPage";
+import DirectBookingPage from "@/pages/commerce/DirectBookingPage";
 import PublicPropertyPage from "@/pages/public/PublicPropertyPage";
 import PublicMenuPage from "@/pages/public/PublicMenuPage";
 import PublicQROrderPage from "@/pages/public/PublicQROrderPage";
@@ -206,6 +215,8 @@ export const ROUTES: readonly AppRoute[] = [
   { path: "/inventory/wastage", component: WastagePage, permission: "stock.view" },
   { path: "/inventory/transfers", component: TransfersPage, permission: "stock.view" },
   { path: "/inventory/stock-takes", component: StockTakesPage, permission: "stock.view" },
+  { path: "/inventory/purchases", component: PurchasesPage, permission: "purchase_order.view" },
+  { path: "/inventory/suppliers", component: SuppliersPage, permission: "supplier.view" },
   { path: "/hotel/room-types", component: RoomTypesPage, permission: "room_type.view" },
   { path: "/hotel/rooms", component: RoomsPage, permission: "room.view" },
   { path: "/hotel/reservations", component: ReservationsPage, permission: "reservation.view" },
@@ -241,6 +252,13 @@ export const ROUTES: readonly AppRoute[] = [
   { path: "/commerce/qr-codes", component: QRCodesPage, permission: "commerce.qr.view" },
   { path: "/commerce/table-requests", component: TableRequestsPage, permission: "commerce.table_request.view" },
   { path: "/commerce/settings", component: CommerceSettingsPage, permission: "commerce.settings.view" },
+  { path: "/commerce/orders", component: OrdersPage, permission: "commerce.order.view" },
+  { path: "/commerce/direct-booking", component: DirectBookingPage, permission: "commerce.view" },
+  // Finance — business accounting, invoices, payments, and P&L.
+  { path: "/finance/invoices", component: FinanceInvoicesPage, permission: "analytics.finance.view" },
+  { path: "/finance/payments", component: FinancePaymentsPage, permission: "analytics.finance.view" },
+  { path: "/finance/accounting", component: AccountingPage, permission: "analytics.finance.view" },
+  { path: "/finance/profit-loss", component: ProfitLossPage, permission: "analytics.profitability.view" },
   { path: "/enterprise", component: EnterpriseOverviewPage, permission: "enterprise.view" },
   { path: "/enterprise/properties", component: EnterprisePropertiesPage, permission: "enterprise.property.view" },
   { path: "/enterprise/attention", component: EnterpriseAttentionPage, permission: "enterprise.alerts.view" },
@@ -270,6 +288,7 @@ export const ROUTES: readonly AppRoute[] = [
   { path: "/analytics/crm", component: CrmAnalyticsPage, permission: "analytics.crm.view" },
   { path: "/analytics/hr", component: HrAnalyticsPage, permission: "analytics.hr.view" },
   { path: "/analytics/commerce", component: CommerceAnalyticsPage, permission: "analytics.commerce.view" },
+  { path: "/analytics/reports", component: ReportsPage, permission: "analytics.dashboard.view" },
   // AI Command Center (049) — natural-language business intelligence.
   { path: "/ai", component: AICommandCenter, permission: "analytics.dashboard.view" },
   // Platform Admin (048) — internal platform operations layer.

@@ -249,7 +249,7 @@ export default function ReservationDetailPage() {
     if (reservation === null) return [];
     return rooms.filter(
       (r) =>
-        r.status === "ACTIVE" &&
+        r.archivedAt == null &&
         r.operationalStatus === "ACTIVE" &&
         (reservation.roomTypeId === null || r.roomTypeId === reservation.roomTypeId),
     );

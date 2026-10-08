@@ -60,13 +60,11 @@ export type Guest = {
   dateOfBirth: string | null;
   nationality: string | null;
   gender: Gender | null;
-  address: string | null;
   vipStatus: VipStatus;
   source: GuestSource | null;
   totalStays: number;
   totalNights: number;
   notes: string | null;
-  status: GuestStatus;
   archivedAt: string | null;
   version: number;
   createdAt: string;
@@ -171,7 +169,6 @@ export type Room = {
   operationalStatus: OperationalStatus;
   housekeepingStatus: HousekeepingStatus;
   notes: string | null;
-  status: "ACTIVE" | "ARCHIVED";
   archivedAt: string | null;
   version: number;
   createdAt: string;

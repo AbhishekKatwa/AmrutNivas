@@ -721,9 +721,9 @@ $$;
 CREATE OR REPLACE FUNCTION app.create_shift(
   p_property_id uuid,
   p_name text,
-  p_code text DEFAULT NULL,
   p_start_time time,
   p_end_time time,
+  p_code text DEFAULT NULL,
   p_break_minutes integer DEFAULT 0,
   p_description text DEFAULT NULL
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -1032,6 +1032,7 @@ $$;
 -- 6. PERMISSIONS
 -- =====================================================================
 
+-- Seed HR permission tokens into role_permissions for ORG_OWNER, ORG_ADMIN, GENERAL_MANAGER, PROPERTY_MANAGER
 DO $$
 DECLARE
   perms text[] := ARRAY[
@@ -1047,38 +1048,21 @@ DECLARE
     'hr.report.view'
   ];
   p text;
+  v_owner uuid;
+  v_admin uuid;
+  v_gm uuid;
+  v_pm uuid;
 BEGIN
-  FOREACH p IN ARRAY perms LOOP
-    INSERT INTO app.permissions (name, description, category)
-    VALUES (p, 'HR: ' || p, 'hr')
-    ON CONFLICT (name) DO NOTHING;
-  END LOOP;
-END $$;
+  SELECT id INTO v_owner FROM public.roles WHERE name = 'ORG_OWNER' AND is_system;
+  SELECT id INTO v_admin FROM public.roles WHERE name = 'ORG_ADMIN' AND is_system;
+  SELECT id INTO v_gm FROM public.roles WHERE name = 'GENERAL_MANAGER' AND is_system;
+  SELECT id INTO v_pm FROM public.roles WHERE name = 'PROPERTY_MANAGER' AND is_system;
 
--- Grant HR permissions to OWNER and MANAGER roles
-DO $$
-DECLARE
-  perms text[] := ARRAY[
-    'hr.view',
-    'hr.employee.view', 'hr.employee.create', 'hr.employee.edit', 'hr.employee.archive',
-    'hr.designation.view', 'hr.designation.manage',
-    'hr.attendance.view', 'hr.attendance.mark', 'hr.attendance.correct',
-    'hr.shift.view', 'hr.shift.manage',
-    'hr.roster.view', 'hr.roster.manage',
-    'hr.leave.view', 'hr.leave.request', 'hr.leave.approve', 'hr.leave.reject',
-    'hr.holiday.view', 'hr.holiday.manage',
-    'hr.document.view', 'hr.document.manage',
-    'hr.report.view'
-  ];
-  p text;
-BEGIN
   FOREACH p IN ARRAY perms LOOP
-    INSERT INTO app.role_permissions (role_name, permission_name)
-    VALUES ('OWNER', p)
-    ON CONFLICT DO NOTHING;
-    INSERT INTO app.role_permissions (role_name, permission_name)
-    VALUES ('MANAGER', p)
-    ON CONFLICT DO NOTHING;
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_owner, p) ON CONFLICT DO NOTHING;
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_admin, p) ON CONFLICT DO NOTHING;
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_gm, p) ON CONFLICT DO NOTHING;
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_pm, p) ON CONFLICT DO NOTHING;
   END LOOP;
 END $$;
 

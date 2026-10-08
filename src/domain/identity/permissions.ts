@@ -16,8 +16,8 @@
  * This is a label-and-lookup layer, not a second permission system: 006's header
  * records the donor project's "role matrix lives twice" failure, so the answer to
  * "may I?" never comes from here — it comes from `my_permissions`/`evaluate_access`.
- * Keys are exactly what the DB stores; the 002 CHECK (`domain.verb`, mirrored as
- * `PERMISSION_PATTERN` in `./types`) is the format contract.
+ * Keys are exactly what the DB stores; the 002 CHECK (dot-separated lowercase
+ * segments, mirrored as `PERMISSION_PATTERN` in `./types`) is the format contract.
  */
 
 import { PERMISSION_PATTERN, type Permission } from "@/domain/identity/types";
@@ -33,6 +33,8 @@ export type PermissionDomain =
   | "table"
   | "order"
   | "kot"
+  | "station"
+  | "shift"
   | "bill"
   | "payment"
   | "inventory"
@@ -342,6 +344,12 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
     verb: "void",
     description: "Void an order — a privileged reversal, taken for a recorded reason.",
   },
+  {
+    key: "order.merge",
+    domain: "order",
+    verb: "merge",
+    description: "Fold one order into another, moving its items across.",
+  },
 
   // ------------------------------------------------------------------------- kot
   {
@@ -369,6 +377,22 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
     description: "Call off a KOT or a line on it before the kitchen serves it.",
   },
 
+  // --------------------------------------------------------------------- station
+  {
+    key: "station.manage",
+    domain: "station",
+    verb: "manage",
+    description: "Add kitchen stations and change or archive them.",
+  },
+
+  // ----------------------------------------------------------------------- shift
+  {
+    key: "shift.manage",
+    domain: "shift",
+    verb: "manage",
+    description: "Open, close and manage the outlet's shifts.",
+  },
+
   // ------------------------------------------------------------------------ bill
   {
     key: "bill.view",
@@ -393,6 +417,12 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
     domain: "bill",
     verb: "void",
     description: "Void a bill — a privileged reversal, taken for a recorded reason.",
+  },
+  {
+    key: "bill.split",
+    domain: "bill",
+    verb: "split",
+    description: "Split an open bill into parts before any payment is taken.",
   },
 
   // --------------------------------------------------------------------- payment
@@ -482,6 +512,13 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
   // cases, security incidents, announcements, feature flags, data export/deletion.
   // Platform permissions are separate from organization permissions — a platform
   // admin operates the SaaS platform, not a customer's business data.
+  {
+    key: "platform.manage",
+    domain: "platform",
+    verb: "manage",
+    description:
+      "Operate the AMRUT NIVAAS platform itself, including administration of any tenant.",
+  },
   {
     key: "platform.dashboard.view",
     domain: "platform",
@@ -1289,9 +1326,9 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
     description: "Change a guest's profile details.",
   },
   {
-    key: "guest.sensitive.view",
+    key: "guest.view_sensitive",
     domain: "guest",
-    verb: "sensitive.view",
+    verb: "view_sensitive",
     description: "See sensitive guest information such as ID documents.",
   },
   {

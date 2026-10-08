@@ -412,7 +412,7 @@ function RoomCard({
   onChangeOperationalStatus,
   onChangeHousekeepingStatus,
 }: RoomCardProps) {
-  const archived = room.status === "ARCHIVED";
+  const archived = room.archivedAt != null;
 
   return (
     <Card padded={false} className={archived ? "opacity-80" : undefined}>
@@ -421,7 +421,7 @@ function RoomCard({
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-base font-semibold text-ink">
               Room {room.roomNumber}
-              {archived && <StatusPill status={room.status} />}
+              {archived && <StatusPill status="ARCHIVED" />}
             </h3>
             <p className="mt-0.5 text-xs text-muted">
               {roomType !== null ? (

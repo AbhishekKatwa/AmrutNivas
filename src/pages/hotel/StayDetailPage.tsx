@@ -203,7 +203,7 @@ export default function StayDetailPage() {
     return rooms.filter(
       (r) =>
         r.id !== stay.roomId &&
-        r.status === "ACTIVE" &&
+        r.archivedAt == null &&
         r.operationalStatus === "ACTIVE" &&
         r.housekeepingStatus === "VACANT_CLEAN" &&
         (room === null || r.roomTypeId === room.roomTypeId),

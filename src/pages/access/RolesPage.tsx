@@ -572,7 +572,12 @@ export default function RolesPage() {
           const access = await listPropertyAccess(organizationId);
           const mine = access.filter((row) => row.userId === selectedUserId);
           const all = mine.some((row) => row.mode === "ALL_PROPERTIES");
-          setPropertyMode(all ? "ALL_PROPERTIES" : "SELECTED_PROPERTIES");
+          // No breadth rows means the person was never narrowed: every org-scoped path
+          // (create_organization §19, assign_role) writes ALL_PROPERTIES, and the doors
+          // refuse an empty SELECTED set — so "zero rows" can never truthfully mean
+          // "narrowed to nothing". Defaulting to SELECTED+empty rendered a pristine
+          // validation error and a dead Save for provisioned owners.
+          setPropertyMode(mine.length === 0 || all ? "ALL_PROPERTIES" : "SELECTED_PROPERTIES");
           setPropertySelection(mine.map((row) => row.propertyId).filter((id): id is EntityId => id !== null));
         } catch {
           /* breadth is optional context; the editor still lets the operator set it */

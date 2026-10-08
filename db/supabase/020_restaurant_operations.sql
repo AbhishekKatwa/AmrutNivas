@@ -158,7 +158,9 @@ begin
     (organization_id, property_id, outlet_id, name, code, description, display_order, created_by)
   values (v_org, v_prop, v_out, btrim(p_name), btrim(p_code),
           nullif(btrim(coalesce(p_description, '')), ''), p_display_order, v_actor)
-  returning to_jsonb(public.kitchen_stations) into v_row;
+  -- The whole-row reference in RETURNING must be the bare table name: schema-qualified,
+  -- Postgres parses "public" as a table alias and raises 42P01 "missing FROM-clause entry".
+  returning to_jsonb(kitchen_stations) into v_row;
 
   perform app.audit('kitchen_station_created', 'kitchen_station', (v_row->>'id')::uuid,
     p_organization := v_org, p_property := v_prop, p_outlet := v_out,
@@ -586,7 +588,8 @@ begin
      discount_type, discount_value, discount_amount, reason, applied_by)
   values (v_org, v_prop, v_out, p_order, p_item_id,
           p_discount_type, p_discount_value, v_amount, p_reason, v_actor)
-  returning to_jsonb(public.order_discounts) into v_row;
+  -- Bare table name in RETURNING whole-row capture (see create_kitchen_station note).
+  returning to_jsonb(order_discounts) into v_row;
 
   -- Update order's discount_amount (sum of all order-level discounts).
   update public.orders
@@ -883,7 +886,8 @@ begin
   insert into public.restaurant_shifts
     (organization_id, property_id, outlet_id, business_date, operator_id, opening_cash, created_by)
   values (v_org, v_prop, v_out, v_bdate, v_actor, coalesce(p_opening_cash, 0), v_actor)
-  returning to_jsonb(public.restaurant_shifts) into v_row;
+  -- Bare table name in RETURNING whole-row capture (see create_kitchen_station note).
+  returning to_jsonb(restaurant_shifts) into v_row;
 
   perform app.audit('shift_opened', 'restaurant_shift', (v_row->>'id')::uuid,
     p_organization := v_org, p_property := v_prop, p_outlet := v_out,

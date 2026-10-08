@@ -452,10 +452,10 @@ export type RolePermission = {
   permission: Permission;
 };
 
-/** A capability, always `domain.verb`: one lowercase segment, one dot, one verb. */
+/** A capability key as 002's CHECK stores it: one or more dot-separated lowercase segments. */
 export type Permission = `${string}.${string}`;
 
-export const PERMISSION_PATTERN = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
+export const PERMISSION_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
 /** The join row that actually answers "may I?". */
 export type RoleGrant = {

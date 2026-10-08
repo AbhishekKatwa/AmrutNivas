@@ -233,12 +233,25 @@ export async function listTenantRoles(organizationId: EntityId): Promise<Role[]>
  */
 export async function listRolePermissions(roleIds: readonly EntityId[]): Promise<RolePermission[]> {
   if (roleIds.length === 0) return [];
-  return camelRows<RolePermission>(
-    requireSupabase()
-      .from("role_permissions")
-      .select("role_id, permission")
-      .in("role_id", [...roleIds]),
-  );
+  // PostgREST caps one page at 1000 rows, and the seeded system roles alone hold more
+  // permission rows than that: a single unpaginated read silently dropped everything past
+  // row 1000 (newly created custom roles rendered "No permissions recorded"). Pages are
+  // walked in a deterministic order — unordered pagination can skip or repeat rows.
+  const ids = [...roleIds];
+  const rows: RolePermission[] = [];
+  for (let from = 0; ; from += 1000) {
+    const page = await camelRows<RolePermission>(
+      requireSupabase()
+        .from("role_permissions")
+        .select("role_id, permission")
+        .in("role_id", ids)
+        .order("role_id")
+        .order("permission")
+        .range(from, from + 999),
+    );
+    rows.push(...page);
+    if (page.length < 1000) return rows;
+  }
 }
 
 /** Every person's property breadth inside one tenant, grouped by person then site. */

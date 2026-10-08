@@ -1025,7 +1025,7 @@ function SectionCard({
             <TableTile
               key={tile.table.id}
               tile={tile}
-              canEdit={canEdit && !archived}
+              canEdit={canEdit && !archived && tile.table.status !== "ARCHIVED"}
               canArchive={canArchive}
               position={liveIds.indexOf(tile.table.id)}
               count={liveIds.length}

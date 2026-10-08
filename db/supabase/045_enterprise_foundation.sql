@@ -138,7 +138,7 @@ create policy property_groups_write on public.property_groups
   for all to authenticated
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('enterprise.group.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'enterprise.group.manage')
   );
 
 -- Property module config: org-scoped, writes need enterprise.property.manage.
@@ -154,7 +154,7 @@ create policy property_module_config_write on public.property_module_config
   for all to authenticated
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('enterprise.property.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'enterprise.property.manage')
   );
 
 -- =====================================================================
@@ -165,53 +165,37 @@ create policy property_module_config_write on public.property_module_config
 -- These are organization-level capabilities that control access to the
 -- enterprise aggregation layer (not operational modules).
 
-INSERT INTO public.role_permissions (permission, role, granted_by)
-VALUES
-  -- Enterprise dashboard and reporting
-  ('enterprise.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.view', 'ORG_OWNER', 'system'),
-  ('enterprise.dashboard.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.dashboard.view', 'ORG_OWNER', 'system'),
-  ('enterprise.reporting.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.reporting.view', 'ORG_OWNER', 'system'),
-  ('enterprise.reporting.export', 'MASTER_ADMIN', 'system'),
-  ('enterprise.reporting.export', 'ORG_OWNER', 'system'),
+DO $$ DECLARE
+  perms text[] := array[
+    'enterprise.view', 'enterprise.dashboard.view', 'enterprise.reporting.view', 'enterprise.reporting.export',
+    'enterprise.property.view', 'enterprise.property.manage',
+    'enterprise.group.view', 'enterprise.group.manage',
+    'enterprise.alerts.view', 'enterprise.global_search.view',
+    'enterprise.master.view', 'enterprise.master.manage',
+    'enterprise.module_config.view', 'enterprise.module_config.manage'
+  ];
+  owner_only text[] := array[
+    'enterprise.property.manage', 'enterprise.group.manage',
+    'enterprise.master.manage', 'enterprise.module_config.manage'
+  ];
+  pm_perms text[] := array[
+    'enterprise.property.view', 'enterprise.alerts.view', 'enterprise.global_search.view'
+  ];
+  p text;
+  v_owner uuid;
+  v_pm uuid;
+BEGIN
+  SELECT id INTO v_owner FROM public.roles WHERE name = 'ORG_OWNER' AND is_system;
+  SELECT id INTO v_pm FROM public.roles WHERE name = 'PROPERTY_MANAGER' AND is_system;
 
-  -- Property management
-  ('enterprise.property.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.property.view', 'ORG_OWNER', 'system'),
-  ('enterprise.property.view', 'PROPERTY_MANAGER', 'system'),
-  ('enterprise.property.manage', 'MASTER_ADMIN', 'system'),
-  ('enterprise.property.manage', 'ORG_OWNER', 'system'),
+  FOREACH p IN ARRAY perms LOOP
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_owner, p) ON CONFLICT DO NOTHING;
+  END LOOP;
 
-  -- Property groups
-  ('enterprise.group.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.group.view', 'ORG_OWNER', 'system'),
-  ('enterprise.group.manage', 'MASTER_ADMIN', 'system'),
-  ('enterprise.group.manage', 'ORG_OWNER', 'system'),
-
-  -- Alerts and attention center
-  ('enterprise.alerts.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.alerts.view', 'ORG_OWNER', 'system'),
-  ('enterprise.alerts.view', 'PROPERTY_MANAGER', 'system'),
-
-  -- Global search
-  ('enterprise.global_search.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.global_search.view', 'ORG_OWNER', 'system'),
-  ('enterprise.global_search.view', 'PROPERTY_MANAGER', 'system'),
-
-  -- Central masters (templates)
-  ('enterprise.master.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.master.view', 'ORG_OWNER', 'system'),
-  ('enterprise.master.manage', 'MASTER_ADMIN', 'system'),
-  ('enterprise.master.manage', 'ORG_OWNER', 'system'),
-
-  -- Module configuration
-  ('enterprise.module_config.view', 'MASTER_ADMIN', 'system'),
-  ('enterprise.module_config.view', 'ORG_OWNER', 'system'),
-  ('enterprise.module_config.manage', 'MASTER_ADMIN', 'system'),
-  ('enterprise.module_config.manage', 'ORG_OWNER', 'system')
-ON CONFLICT DO NOTHING;
+  FOREACH p IN ARRAY pm_perms LOOP
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_pm, p) ON CONFLICT DO NOTHING;
+  END LOOP;
+END $$;
 
 -- =====================================================================
 -- 6. ENTERPRISE DOORS
@@ -232,7 +216,7 @@ as $$
 declare
   v_group_id uuid;
 begin
-  if not app.has_permission('enterprise.group.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'enterprise.group.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -273,7 +257,7 @@ begin
     raise exception 'NIVAAS_NOT_FOUND';
   end if;
 
-  if not app.has_permission('enterprise.group.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'enterprise.group.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -315,7 +299,7 @@ begin
     raise exception 'NIVAAS_NOT_FOUND';
   end if;
 
-  if not app.has_permission('enterprise.property.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'enterprise.property.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -371,7 +355,7 @@ begin
     raise exception 'NIVAAS_NOT_FOUND';
   end if;
 
-  if not app.has_permission('enterprise.module_config.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'enterprise.module_config.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 

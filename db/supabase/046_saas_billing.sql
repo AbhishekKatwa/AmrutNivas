@@ -417,8 +417,8 @@ create policy subscription_plans_select on public.subscription_plans
 
 drop policy if exists subscription_plans_write on public.subscription_plans;
 create policy subscription_plans_write on public.subscription_plans
-  for all to authenticated
-  with check (app.has_permission('billing.plan.manage'));
+  for all
+  with check (app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.plan.manage'));
 
 -- Plan features and limits follow the plan's write policy.
 ALTER TABLE public.plan_features ENABLE ROW LEVEL SECURITY;
@@ -430,8 +430,8 @@ create policy plan_features_select on public.plan_features
 
 drop policy if exists plan_features_write on public.plan_features;
 create policy plan_features_write on public.plan_features
-  for all to authenticated
-  with check (app.has_permission('billing.plan.manage'));
+  for all
+  with check (app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.plan.manage'));
 
 ALTER TABLE public.plan_limits ENABLE ROW LEVEL SECURITY;
 
@@ -442,8 +442,8 @@ create policy plan_limits_select on public.plan_limits
 
 drop policy if exists plan_limits_write on public.plan_limits;
 create policy plan_limits_write on public.plan_limits
-  for all to authenticated
-  with check (app.has_permission('billing.plan.manage'));
+  for all
+  with check (app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.plan.manage'));
 
 -- Subscriptions are org-scoped.
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
@@ -455,10 +455,10 @@ create policy subscriptions_select on public.subscriptions
 
 drop policy if exists subscriptions_write on public.subscriptions;
 create policy subscriptions_write on public.subscriptions
-  for all to authenticated
+  for all
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('billing.subscription.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.subscription.manage')
   );
 
 -- Subscription events are org-scoped (read-only for most users).
@@ -479,10 +479,10 @@ create policy billing_accounts_select on public.billing_accounts
 
 drop policy if exists billing_accounts_write on public.billing_accounts;
 create policy billing_accounts_write on public.billing_accounts
-  for all to authenticated
+  for all
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('billing.account.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.account.manage')
   );
 
 -- SaaS invoices are org-scoped.
@@ -495,10 +495,10 @@ create policy saas_invoices_select on public.saas_invoices
 
 drop policy if exists saas_invoices_write on public.saas_invoices;
 create policy saas_invoices_write on public.saas_invoices
-  for all to authenticated
+  for all
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('billing.invoice.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.invoice.manage')
   );
 
 -- Invoice lines follow the invoice's policy.
@@ -524,10 +524,10 @@ create policy saas_payments_select on public.saas_payments
 
 drop policy if exists saas_payments_write on public.saas_payments;
 create policy saas_payments_write on public.saas_payments
-  for all to authenticated
+  for all
   with check (
     organization_id = app.current_organization_id()
-    and app.has_permission('billing.payment.manage')
+    and app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.payment.manage')
   );
 
 -- Usage snapshots are org-scoped (read-only for most users).
@@ -548,8 +548,8 @@ create policy saas_billing_settings_select on public.saas_billing_settings
 
 drop policy if exists saas_billing_settings_write on public.saas_billing_settings;
 create policy saas_billing_settings_write on public.saas_billing_settings
-  for all to authenticated
-  with check (app.has_permission('billing.settings.manage'));
+  for all
+  with check (app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.settings.manage'));
 
 -- =====================================================================
 -- 13. BILLING PERMISSIONS
@@ -558,44 +558,23 @@ create policy saas_billing_settings_write on public.saas_billing_settings
 -- SaaS billing permissions. Platform admin manages plans and settings.
 -- Organization owner manages their own subscription, billing account, invoices, payments.
 
-INSERT INTO public.role_permissions (permission, role, granted_by)
-VALUES
-  -- Plan management (platform admin only)
-  ('billing.plan.view', 'MASTER_ADMIN', 'system'),
-  ('billing.plan.manage', 'MASTER_ADMIN', 'system'),
+DO $$ DECLARE
+  perms text[] := array[
+    'billing.subscription.view', 'billing.subscription.manage',
+    'billing.account.view', 'billing.account.manage',
+    'billing.invoice.view', 'billing.invoice.manage',
+    'billing.payment.view', 'billing.payment.manage',
+    'billing.usage.view'
+  ];
+  p text;
+  v_owner uuid;
+BEGIN
+  SELECT id INTO v_owner FROM public.roles WHERE name = 'ORG_OWNER' AND is_system;
 
-  -- Subscription management (org owner + platform admin)
-  ('billing.subscription.view', 'MASTER_ADMIN', 'system'),
-  ('billing.subscription.view', 'ORG_OWNER', 'system'),
-  ('billing.subscription.manage', 'MASTER_ADMIN', 'system'),
-  ('billing.subscription.manage', 'ORG_OWNER', 'system'),
-
-  -- Billing account (org owner + platform admin)
-  ('billing.account.view', 'MASTER_ADMIN', 'system'),
-  ('billing.account.view', 'ORG_OWNER', 'system'),
-  ('billing.account.manage', 'MASTER_ADMIN', 'system'),
-  ('billing.account.manage', 'ORG_OWNER', 'system'),
-
-  -- Invoices (org owner + platform admin)
-  ('billing.invoice.view', 'MASTER_ADMIN', 'system'),
-  ('billing.invoice.view', 'ORG_OWNER', 'system'),
-  ('billing.invoice.manage', 'MASTER_ADMIN', 'system'),
-  ('billing.invoice.manage', 'ORG_OWNER', 'system'),
-
-  -- Payments (org owner + platform admin)
-  ('billing.payment.view', 'MASTER_ADMIN', 'system'),
-  ('billing.payment.view', 'ORG_OWNER', 'system'),
-  ('billing.payment.manage', 'MASTER_ADMIN', 'system'),
-  ('billing.payment.manage', 'ORG_OWNER', 'system'),
-
-  -- Usage (org owner + platform admin)
-  ('billing.usage.view', 'MASTER_ADMIN', 'system'),
-  ('billing.usage.view', 'ORG_OWNER', 'system'),
-
-  -- Settings (platform admin only)
-  ('billing.settings.view', 'MASTER_ADMIN', 'system'),
-  ('billing.settings.manage', 'MASTER_ADMIN', 'system')
-ON CONFLICT DO NOTHING;
+  FOREACH p IN ARRAY perms LOOP
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_owner, p) ON CONFLICT DO NOTHING;
+  END LOOP;
+END $$;
 
 -- =====================================================================
 -- 14. SAAS BILLING DOORS
@@ -620,7 +599,7 @@ declare
   v_period_end date;
   v_result jsonb;
 begin
-  if not app.has_permission('billing.subscription.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.subscription.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -669,8 +648,8 @@ begin
     )
     returning id into v_sub_id;
 
-    returning to_jsonb(subscriptions.*) into v_result
-    from public.subscriptions where id = v_sub_id;
+    select to_jsonb(s.*) into v_result
+    from public.subscriptions s where id = v_sub_id;
 
     -- Record events.
     insert into public.subscription_events (subscription_id, organization_id, event_type, metadata)
@@ -709,7 +688,7 @@ begin
     raise exception 'NIVAAS_NOT_FOUND';
   end if;
 
-  if not app.has_permission('billing.subscription.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.subscription.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -760,7 +739,7 @@ as $$
 declare
   v_result jsonb;
 begin
-  if not app.has_permission('billing.account.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.account.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -844,7 +823,7 @@ declare
   v_invoice_number text;
   v_result jsonb;
 begin
-  if not app.has_permission('billing.invoice.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.invoice.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -883,7 +862,7 @@ declare
   v_payment_id uuid;
   v_result jsonb;
 begin
-  if not app.has_permission('billing.payment.manage') then
+  if not app.has_permission(app.current_user_id(), app.current_organization_id(), 'billing.payment.manage') then
     raise exception 'NIVAAS_PERMISSION_DENIED';
   end if;
 
@@ -916,8 +895,8 @@ begin
     values (p_subscription, p_organization, 'PAYMENT_SUCCEEDED', jsonb_build_object('amount', p_amount));
   end if;
 
-  returning to_jsonb(saas_payments.*) into v_result
-  from public.saas_payments where id = v_payment_id;
+  select to_jsonb(p.*) into v_result
+  from public.saas_payments p where id = v_payment_id;
 
   return v_result;
 end;

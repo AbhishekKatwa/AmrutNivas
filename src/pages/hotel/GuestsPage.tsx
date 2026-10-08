@@ -18,7 +18,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { LoadingBlock } from "@/components/ui/Spinner";
 import { SelectInput } from "@/components/ui/SelectInput";
-import { StatusPill } from "@/components/ui/StatusPill";
 import { Switch } from "@/components/ui/Switch";
 import { TextInput } from "@/components/ui/TextInput";
 import { Textarea } from "@/components/ui/Textarea";
@@ -362,7 +361,7 @@ type GuestCardProps = {
 };
 
 function GuestCard({ guest, canEdit, canArchive, onEdit, onArchive }: GuestCardProps) {
-  const archived = guest.status === "ARCHIVED";
+  const archived = guest.archivedAt != null;
 
   return (
     <Card padded={false} className={archived ? "opacity-80" : undefined}>
@@ -371,7 +370,7 @@ function GuestCard({ guest, canEdit, canArchive, onEdit, onArchive }: GuestCardP
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-base font-semibold text-ink">
               {guest.firstName} {guest.lastName}
-              {archived && <StatusPill status={guest.status} />}
+              {archived && <Badge tone="muted">Archived</Badge>}
               {guest.vipStatus !== "REGULAR" && (
                 <Badge tone={guest.vipStatus === "VVIP" ? "warning" : "neutral"}>
                   {guest.vipStatus}

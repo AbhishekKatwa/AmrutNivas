@@ -198,7 +198,7 @@ export default function CustomersPage() {
 }
 
 function CustomerCard({ guest }: { guest: Guest }) {
-  const archived = guest.status === "ARCHIVED";
+  const archived = guest.archivedAt != null;
 
   return (
     <a

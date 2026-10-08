@@ -29,7 +29,7 @@ const ROOM_TYPE_COLUMNS =
 
 const ROOM_COLUMNS =
   "id, organization_id, property_id, room_type_id, room_number, floor, building, " +
-  "operational_status, housekeeping_status, notes, status, archived_at, version, " +
+  "operational_status, housekeeping_status, notes, archived_at, version, " +
   "created_at, updated_at";
 
 const AMENITY_COLUMNS =
@@ -236,7 +236,7 @@ export async function listRooms(
     .eq("property_id", scope.propertyId);
 
   if (!options.includeArchived) {
-    chain = chain.eq("status", "ACTIVE");
+    chain = chain.is("archived_at", null);
   }
 
   chain = chain.order("room_number", { ascending: true });

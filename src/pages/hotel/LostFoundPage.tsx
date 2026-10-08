@@ -199,7 +199,7 @@ export default function LostFoundPage() {
     () => [
       { value: "", label: "No specific room" },
       ...rooms
-        .filter((r) => r.status !== "ARCHIVED")
+        .filter((r) => r.archivedAt == null)
         .map((r) => ({ value: r.id, label: `Room ${r.roomNumber}` })),
     ],
     [rooms],

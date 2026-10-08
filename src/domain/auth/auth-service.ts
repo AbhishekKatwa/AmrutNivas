@@ -136,7 +136,17 @@ export async function requestPasswordReset(userId: string): Promise<void> {
   if (typeof email !== "string" || email.length === 0) return;
 
   const redirect = typeof window !== "undefined" ? `${appUrl()}${SIGN_IN_PATH}` : undefined;
-  await client.auth.resetPasswordForEmail(email, redirect ? { redirectTo: redirect } : undefined);
+  const { error } = await client.auth.resetPasswordForEmail(email, redirect ? { redirectTo: redirect } : undefined);
+  if (error !== null) {
+    // GoTrue rejects the request itself (bad email domain, SMTP outage, throttling) —
+    // the caller must see that instead of a false "check your inbox" (§18 keeps the
+    // user-existence silence; an infrastructure failure is not account information).
+    throw new AppError(
+      "INTERNAL",
+      "We could not send the reset email. Please try again shortly or contact your administrator.",
+      { cause: error },
+    );
+  }
 }
 
 /**
@@ -216,6 +226,7 @@ export async function devBypassSignIn(email: string): Promise<void> {
   sessionStorage.setItem("dev-bypass-auth", "true");
   sessionStorage.setItem("dev-bypass-email", email.trim());
 
-  // Trigger a page reload so the context store re-bootstraps with the dev flag
-  window.location.reload();
+  // Trigger a fresh page load so the context store re-bootstraps with the dev
+  // flag, landing on the app's own landing path instead of the sign-in surface.
+  window.location.assign("/");
 }

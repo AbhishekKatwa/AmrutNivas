@@ -12,6 +12,7 @@
  */
 
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, User, Zap } from "lucide-react";
 import { backendUnavailableReason } from "@/db/client";
 import { signInWithPassword, requestPasswordReset, devBypassSignIn } from "@/domain/auth/auth-service";
@@ -26,6 +27,7 @@ import { TextInput } from "@/components/ui/TextInput";
 type Phase = "login" | "submitting" | "forgot" | "forgot-submitting" | "forgot-sent";
 
 export default function SignInPage() {
+  const navigate = useNavigate();
   const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -49,6 +51,7 @@ export default function SignInPage() {
     setPhase("submitting");
     try {
       await signInWithPassword(trimmedId, password);
+      navigate("/", { replace: true });
     } catch (caught: unknown) {
       setError(publicErrorMessage(caught));
       setPhase("login");

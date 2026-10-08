@@ -212,7 +212,8 @@ export function propertyFormValues(
     currency: row.currency,
     timezone: row.timezone,
     locale: row.locale,
-    businessDayStart: row.businessDayStart,
+    // Postgres `time` reads back as HH:MM:SS; the validator and the time input speak HH:MM.
+    businessDayStart: row.businessDayStart.slice(0, 5),
     addressLine1: text(row.addressLine1),
     addressLine2: text(row.addressLine2),
     city: text(row.city),

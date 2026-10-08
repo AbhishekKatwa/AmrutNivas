@@ -176,7 +176,7 @@ export default function FrontDeskPage() {
   };
 
   const roomStats = useMemo(() => {
-    const active = rooms.filter((r) => r.status === "ACTIVE");
+    const active = rooms.filter((r) => r.archivedAt == null);
     const available = active.filter((r) => r.operationalStatus === "ACTIVE" && r.housekeepingStatus === "VACANT_CLEAN");
     const occupied = active.filter((r) => r.housekeepingStatus === "OCCUPIED_CLEAN" || r.housekeepingStatus === "OCCUPIED_DIRTY");
     const dirty = active.filter((r) => r.housekeepingStatus === "VACANT_DIRTY");
@@ -297,7 +297,7 @@ export default function FrontDeskPage() {
                     roomType={roomTypeById.get(res.roomTypeId ?? "") ?? null}
                     availableRooms={rooms.filter(
                       (r) =>
-                        r.status === "ACTIVE" &&
+                        r.archivedAt == null &&
                         r.operationalStatus === "ACTIVE" &&
                         r.housekeepingStatus === "VACANT_CLEAN" &&
                         (res.roomTypeId === null || r.roomTypeId === res.roomTypeId),

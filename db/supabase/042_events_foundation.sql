@@ -4,6 +4,27 @@
 -- Writes through security-definer doors; reads under RLS.
 
 -- =====================================================================
+-- 0. CONTEXT HELPERS (used by 042–048)
+-- =====================================================================
+
+-- Profile id is the same as auth.uid(); this alias is used throughout 042+.
+create or replace function app.current_profile_id()
+returns uuid
+language sql
+stable
+as $$ select app.current_user_id(); $$;
+
+-- Current organization is set by the client via set_config('app.organization_id', …, true)
+-- inside a transaction. If unset, return null — RLS policies and doors must handle that.
+create or replace function app.current_organization_id()
+returns uuid
+language sql
+stable
+as $$
+  select nullif(current_setting('app.organization_id', true), '')::uuid;
+$$;
+
+-- =====================================================================
 -- 1. ENUMS
 -- =====================================================================
 
@@ -491,13 +512,13 @@ ALTER TABLE event_vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_payments ENABLE ROW LEVEL SECURITY;
 
--- Org-scoped SELECT for all event tables
+-- Org-scoped SELECT for all event tables (parent tables with organization_id)
 DO $$ DECLARE
   t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'event_venues', 'events', 'event_leads', 'event_quotations',
-    'event_quotation_items', 'event_packages', 'event_package_items',
+    'event_packages',
     'event_tasks', 'event_schedule_items', 'event_resources',
     'event_vendors', 'event_changes', 'event_payments'
   ] LOOP
@@ -508,6 +529,17 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+-- Child tables: scope via parent
+CREATE POLICY "event_quotation_items_select_org" ON event_quotation_items FOR SELECT TO authenticated
+  USING (quotation_id IN (
+    SELECT q.id FROM event_quotations q WHERE q.organization_id = app.current_organization_id()
+  ));
+
+CREATE POLICY "event_package_items_select_org" ON event_package_items FOR SELECT TO authenticated
+  USING (package_id IN (
+    SELECT p.id FROM event_packages p WHERE p.organization_id = app.current_organization_id()
+  ));
 
 -- =====================================================================
 -- 5. DOORS (security-definer write RPCs)
@@ -1234,35 +1266,7 @@ $$;
 -- 6. PERMISSIONS
 -- =====================================================================
 
-DO $$
-DECLARE
-  perms text[] := ARRAY[
-    'events.view',
-    'events.lead.view', 'events.lead.create', 'events.lead.edit',
-    'events.lead.convert', 'events.lead.assign', 'events.lead.close',
-    'events.event.view', 'events.event.create', 'events.event.edit',
-    'events.event.confirm', 'events.event.cancel', 'events.event.complete',
-    'events.venue.view', 'events.venue.manage',
-    'events.quotation.view', 'events.quotation.create', 'events.quotation.edit',
-    'events.quotation.send', 'events.quotation.accept', 'events.quotation.cancel',
-    'events.payment.view', 'events.payment.create', 'events.payment.refund',
-    'events.plan.view', 'events.plan.manage',
-    'events.task.view', 'events.task.create', 'events.task.manage',
-    'events.vendor.view', 'events.vendor.manage',
-    'events.schedule.view', 'events.schedule.manage',
-    'events.pnl.view',
-    'events.documents.view', 'events.documents.manage'
-  ];
-  p text;
-BEGIN
-  FOREACH p IN ARRAY perms LOOP
-    INSERT INTO app.permissions (name, description, category)
-    VALUES (p, 'Event: ' || p, 'events')
-    ON CONFLICT (name) DO NOTHING;
-  END LOOP;
-END $$;
-
--- Grant event permissions to OWNER and MANAGER roles
+-- Seed event permission tokens into role_permissions for ORG_OWNER, ORG_ADMIN, GENERAL_MANAGER, PROPERTY_MANAGER
 DO $$
 DECLARE
   perms text[] := ARRAY[
@@ -1281,14 +1285,21 @@ DECLARE
     'events.pnl.view', 'events.documents.view', 'events.documents.manage'
   ];
   p text;
+  v_owner uuid;
+  v_admin uuid;
+  v_gm uuid;
+  v_pm uuid;
 BEGIN
+  SELECT id INTO v_owner FROM public.roles WHERE name = 'ORG_OWNER' AND is_system;
+  SELECT id INTO v_admin FROM public.roles WHERE name = 'ORG_ADMIN' AND is_system;
+  SELECT id INTO v_gm FROM public.roles WHERE name = 'GENERAL_MANAGER' AND is_system;
+  SELECT id INTO v_pm FROM public.roles WHERE name = 'PROPERTY_MANAGER' AND is_system;
+
   FOREACH p IN ARRAY perms LOOP
-    INSERT INTO app.role_permissions (role_name, permission_name)
-    VALUES ('OWNER', p)
-    ON CONFLICT DO NOTHING;
-    INSERT INTO app.role_permissions (role_name, permission_name)
-    VALUES ('MANAGER', p)
-    ON CONFLICT DO NOTHING;
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_owner, p) ON CONFLICT DO NOTHING;
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_admin, p) ON CONFLICT DO NOTHING;
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_gm, p) ON CONFLICT DO NOTHING;
+    INSERT INTO public.role_permissions (role_id, permission) VALUES (v_pm, p) ON CONFLICT DO NOTHING;
   END LOOP;
 END $$;
 

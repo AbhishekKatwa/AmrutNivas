@@ -47,7 +47,7 @@ export type AccessFacts = {
   readonly propertyReachable: boolean;
   readonly outletRequested: EntityId | null;
   readonly outletReachable: boolean;
-  /** The capability being asked about; a non-`domain.verb` value is a programming error. */
+  /** The capability being asked about; a key outside 002's format is a programming error. */
   readonly permissionRequested: string | null;
   readonly permissionHeld: boolean;
 };

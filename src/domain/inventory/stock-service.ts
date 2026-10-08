@@ -386,7 +386,9 @@ export async function consumeForOrder(
   quantity: number,
   orderId: EntityId
 ): Promise<void> {
-  const idempotencyKey = `CONSUMPTION:${orderId}:${menuItemId}:${Date.now()}`;
+  // The server dedupes on this exact string; it must be stable across retries of the
+  // same consumption event. When this is wired to order lines, the line id belongs here.
+  const idempotencyKey = `CONSUMPTION:${orderId}:${menuItemId}`;
   await callDoor("consume_for_order", {
     p_organization: organizationId,
     p_property: propertyId,

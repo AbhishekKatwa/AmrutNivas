@@ -208,7 +208,7 @@ export default function CustomerProfilePage() {
                             {customer.vipStatus}
                           </Badge>
                         )}
-                        {customer.status === "ARCHIVED" && <Badge tone="muted">Archived</Badge>}
+                        {customer.archivedAt != null && <Badge tone="muted">Archived</Badge>}
                       </h2>
                       <p className="mt-1 text-sm text-muted">
                         {[customer.phone, customer.email].filter(Boolean).join(" · ") || "No contact details"}

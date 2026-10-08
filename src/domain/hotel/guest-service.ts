@@ -22,7 +22,7 @@ const GUEST_DOCUMENTS = "guest_documents";
 
 const GUEST_COLUMNS =
   "id, organization_id, first_name, last_name, phone, email, date_of_birth, nationality, " +
-  "gender, address, vip_status, source, total_stays, total_nights, notes, status, archived_at, " +
+  "gender, vip_status, source, total_stays, total_nights, notes, archived_at, " +
   "version, created_at, updated_at, customer_type, company_name, designation, anniversary_date, " +
   "corporate_account_id";
 
@@ -51,7 +51,7 @@ export async function listGuests(
   let chain = sb.from(GUESTS).select(GUEST_COLUMNS).eq("organization_id", scope.organizationId);
 
   if (!options.includeArchived) {
-    chain = chain.eq("status", "ACTIVE");
+    chain = chain.is("archived_at", null);
   }
 
   chain = chain.order("last_name", { ascending: true }).order("first_name", { ascending: true });
@@ -72,7 +72,7 @@ export async function searchGuests(
     .from(GUESTS)
     .select(GUEST_COLUMNS)
     .eq("organization_id", scope.organizationId)
-    .eq("status", "ACTIVE")
+    .is("archived_at", null)
     .or(`first_name.ilike.${term},last_name.ilike.${term},phone.ilike.${term},email.ilike.${term}`)
     .order("last_name", { ascending: true })
     .limit(limit);
@@ -141,7 +141,7 @@ export async function createGuest(
     p_dob: params.dateOfBirth ?? null,
     p_nationality: params.nationality ?? null,
     p_gender: params.gender ?? null,
-    p_address: params.address ?? null,
+    p_address_line1: params.address ?? null,
     p_vip_status: params.vipStatus ?? "REGULAR",
     p_source: params.source ?? null,
     p_notes: params.notes ?? null,
@@ -178,7 +178,7 @@ export async function updateGuest(
     p_dob: params.dateOfBirth,
     p_nationality: params.nationality,
     p_gender: params.gender,
-    p_address: params.address,
+    p_address_line1: params.address,
     p_vip_status: params.vipStatus,
     p_source: params.source,
     p_notes: params.notes,

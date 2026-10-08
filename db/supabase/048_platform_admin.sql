@@ -17,7 +17,7 @@
 
 -- Platform-level roles (separate from organization roles)
 CREATE TABLE IF NOT EXISTS app.platform_roles (
-    id text PRIMARY KEY DEFAULT 'pr_' || lower(hex(random_bytes(12))),
+    id text PRIMARY KEY DEFAULT 'pr_' || encode(extensions.gen_random_bytes(12), 'hex'),
     code text NOT NULL UNIQUE,
     name text NOT NULL,
     description text,
@@ -197,10 +197,10 @@ ON CONFLICT DO NOTHING;
 
 -- Assign platform roles to users (separate from organization memberships)
 CREATE TABLE IF NOT EXISTS app.platform_user_roles (
-    user_id text NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     platform_role_id text NOT NULL REFERENCES app.platform_roles(id) ON DELETE CASCADE,
     granted_at timestamptz NOT NULL DEFAULT now(),
-    granted_by text REFERENCES public.profiles(id),
+    granted_by uuid REFERENCES public.profiles(id),
     PRIMARY KEY (user_id, platform_role_id)
 );
 
@@ -244,7 +244,7 @@ CREATE POLICY "Platform user roles are readable by platform users" ON app.platfo
 
 -- Only super admins can modify platform user roles
 CREATE POLICY "Only super admins can manage platform user roles" ON app.platform_user_roles
-    FOR ALL TO authenticated
+    FOR ALL
     USING (EXISTS (
         SELECT 1 FROM app.platform_user_roles pur
         JOIN app.platform_roles pr ON pr.id = pur.platform_role_id
@@ -257,11 +257,11 @@ CREATE POLICY "Only super admins can manage platform user roles" ON app.platform
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS app.support_cases (
-    id text PRIMARY KEY DEFAULT 'sup_' || lower(hex(random_bytes(12))),
-    organization_id text REFERENCES app.organizations(id),
-    property_id text REFERENCES app.properties(id),
-    outlet_id text REFERENCES app.outlets(id),
-    requester_id text REFERENCES public.profiles(id),
+    id text PRIMARY KEY DEFAULT 'sup_' || encode(extensions.gen_random_bytes(12), 'hex'),
+    organization_id uuid REFERENCES public.organizations(id),
+    property_id uuid REFERENCES public.properties(id),
+    outlet_id uuid REFERENCES public.outlets(id),
+    requester_id uuid REFERENCES public.profiles(id),
     title text NOT NULL,
     description text NOT NULL,
     category text NOT NULL CHECK (category IN (
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS app.support_cases (
         'OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_FOR_CUSTOMER',
         'WAITING_INTERNAL', 'RESOLVED', 'CLOSED'
     )),
-    assigned_to text REFERENCES public.profiles(id),
+    assigned_to uuid REFERENCES public.profiles(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     resolved_at timestamptz
@@ -288,9 +288,9 @@ CREATE INDEX IF NOT EXISTS idx_support_cases_assigned ON app.support_cases(assig
 
 -- Support case notes (internal and customer-visible)
 CREATE TABLE IF NOT EXISTS app.support_case_notes (
-    id text PRIMARY KEY DEFAULT 'note_' || lower(hex(random_bytes(12))),
+    id text PRIMARY KEY DEFAULT 'note_' || encode(extensions.gen_random_bytes(12), 'hex'),
     case_id text NOT NULL REFERENCES app.support_cases(id) ON DELETE CASCADE,
-    author_id text NOT NULL REFERENCES public.profiles(id),
+    author_id uuid NOT NULL REFERENCES public.profiles(id),
     content text NOT NULL,
     visibility text NOT NULL DEFAULT 'INTERNAL' CHECK (visibility IN ('INTERNAL', 'CUSTOMER_VISIBLE')),
     created_at timestamptz NOT NULL DEFAULT now()
@@ -317,14 +317,14 @@ CREATE POLICY "Support cases readable by authorized users" ON app.support_cases
         )
         -- Organization members can read their own cases
         OR organization_id IN (
-            SELECT organization_id FROM app.memberships
+            SELECT organization_id FROM public.organization_memberships
             WHERE user_id = auth.uid() AND status = 'ACTIVE'
         )
     );
 
 -- Support cases writable by platform support
 CREATE POLICY "Support cases writable by platform support" ON app.support_cases
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -349,7 +349,7 @@ CREATE POLICY "Support case notes readable by authorized users" ON app.support_c
                     AND prp.permission = 'platform.support.view'
                 )
                 OR sc.organization_id IN (
-                    SELECT organization_id FROM app.memberships
+                    SELECT organization_id FROM public.organization_memberships
                     WHERE user_id = auth.uid() AND status = 'ACTIVE'
                 )
             )
@@ -371,7 +371,7 @@ CREATE POLICY "Internal notes only visible to platform support" ON app.support_c
 
 -- Support case notes writable by platform support
 CREATE POLICY "Support case notes writable by platform support" ON app.support_case_notes
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -386,11 +386,11 @@ CREATE POLICY "Support case notes writable by platform support" ON app.support_c
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS app.support_access_sessions (
-    id text PRIMARY KEY DEFAULT 'sas_' || lower(hex(random_bytes(12))),
-    platform_admin_id text NOT NULL REFERENCES public.profiles(id),
-    organization_id text NOT NULL REFERENCES app.organizations(id),
-    property_id text REFERENCES app.properties(id),
-    outlet_id text REFERENCES app.outlets(id),
+    id text PRIMARY KEY DEFAULT 'sas_' || encode(extensions.gen_random_bytes(12), 'hex'),
+    platform_admin_id uuid NOT NULL REFERENCES public.profiles(id),
+    organization_id uuid NOT NULL REFERENCES public.organizations(id),
+    property_id uuid REFERENCES public.properties(id),
+    outlet_id uuid REFERENCES public.outlets(id),
     reason text NOT NULL,
     scope text NOT NULL DEFAULT 'READ_ONLY' CHECK (scope IN (
         'ORGANIZATION', 'PROPERTY', 'OUTLET', 'READ_ONLY', 'SPECIFIC_MODULE'
@@ -425,7 +425,7 @@ CREATE POLICY "Support access sessions readable by authorized users" ON app.supp
 
 -- Support access sessions writable by platform support with impersonate permission
 CREATE POLICY "Support access sessions manageable by platform support" ON app.support_access_sessions
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -440,8 +440,8 @@ CREATE POLICY "Support access sessions manageable by platform support" ON app.su
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS app.security_incidents (
-    id text PRIMARY KEY DEFAULT 'inc_' || lower(hex(random_bytes(12))),
-    organization_id text REFERENCES app.organizations(id),
+    id text PRIMARY KEY DEFAULT 'inc_' || encode(extensions.gen_random_bytes(12), 'hex'),
+    organization_id uuid REFERENCES public.organizations(id),
     severity text NOT NULL CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
     category text NOT NULL CHECK (category IN (
         'ACCOUNT_COMPROMISE', 'UNAUTHORIZED_ACCESS', 'API_ABUSE', 'DATA_EXPOSURE',
@@ -453,7 +453,7 @@ CREATE TABLE IF NOT EXISTS app.security_incidents (
     title text NOT NULL,
     description text,
     detected_at timestamptz NOT NULL DEFAULT now(),
-    assigned_to text REFERENCES public.profiles(id),
+    assigned_to uuid REFERENCES public.profiles(id),
     resolved_at timestamptz,
     resolution text,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -480,14 +480,14 @@ CREATE POLICY "Security incidents readable by authorized users" ON app.security_
             AND prp.permission = 'platform.security.view'
         )
         OR (organization_id IS NOT NULL AND organization_id IN (
-            SELECT organization_id FROM app.memberships
+            SELECT organization_id FROM public.organization_memberships
             WHERE user_id = auth.uid() AND status = 'ACTIVE'
         ))
     );
 
 -- Security incidents writable by platform security
 CREATE POLICY "Security incidents manageable by platform security" ON app.security_incidents
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -502,7 +502,7 @@ CREATE POLICY "Security incidents manageable by platform security" ON app.securi
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS app.platform_announcements (
-    id text PRIMARY KEY DEFAULT 'ann_' || lower(hex(random_bytes(12))),
+    id text PRIMARY KEY DEFAULT 'ann_' || encode(extensions.gen_random_bytes(12), 'hex'),
     title text NOT NULL,
     message text NOT NULL,
     severity text NOT NULL DEFAULT 'INFO' CHECK (severity IN ('INFO', 'NOTICE', 'WARNING', 'CRITICAL')),
@@ -513,7 +513,7 @@ CREATE TABLE IF NOT EXISTS app.platform_announcements (
     target_organizations text[], -- if target_audience = SPECIFIC_ORGANIZATIONS
     start_at timestamptz NOT NULL DEFAULT now(),
     end_at timestamptz,
-    created_by text NOT NULL REFERENCES public.profiles(id),
+    created_by uuid NOT NULL REFERENCES public.profiles(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -549,7 +549,7 @@ CREATE POLICY "All announcements readable by platform admins" ON app.platform_an
 
 -- Announcements writable by platform admins
 CREATE POLICY "Announcements manageable by platform admins" ON app.platform_announcements
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -564,7 +564,7 @@ CREATE POLICY "Announcements manageable by platform admins" ON app.platform_anno
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS app.feature_flags (
-    id text PRIMARY KEY DEFAULT 'ff_' || lower(hex(random_bytes(12))),
+    id text PRIMARY KEY DEFAULT 'ff_' || encode(extensions.gen_random_bytes(12), 'hex'),
     key text NOT NULL UNIQUE,
     name text NOT NULL,
     description text,
@@ -600,7 +600,7 @@ CREATE POLICY "Feature flags readable by platform admins" ON app.feature_flags
 
 -- Feature flags writable by platform super admins
 CREATE POLICY "Feature flags manageable by platform super admins" ON app.feature_flags
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -615,9 +615,9 @@ CREATE POLICY "Feature flags manageable by platform super admins" ON app.feature
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS app.data_export_requests (
-    id text PRIMARY KEY DEFAULT 'exp_' || lower(hex(random_bytes(12))),
-    organization_id text NOT NULL REFERENCES app.organizations(id),
-    requester_id text NOT NULL REFERENCES public.profiles(id),
+    id text PRIMARY KEY DEFAULT 'exp_' || encode(extensions.gen_random_bytes(12), 'hex'),
+    organization_id uuid NOT NULL REFERENCES public.organizations(id),
+    requester_id uuid NOT NULL REFERENCES public.profiles(id),
     reason text NOT NULL,
     status text NOT NULL DEFAULT 'REQUESTED' CHECK (status IN (
         'REQUESTED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED'
@@ -652,7 +652,7 @@ CREATE POLICY "Data export requests readable by authorized users" ON app.data_ex
 
 -- Data export requests writable by platform support
 CREATE POLICY "Data export requests manageable by platform support" ON app.data_export_requests
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -667,15 +667,15 @@ CREATE POLICY "Data export requests manageable by platform support" ON app.data_
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS app.data_deletion_requests (
-    id text PRIMARY KEY DEFAULT 'del_' || lower(hex(random_bytes(12))),
-    organization_id text NOT NULL REFERENCES app.organizations(id),
-    requester_id text NOT NULL REFERENCES public.profiles(id),
+    id text PRIMARY KEY DEFAULT 'del_' || encode(extensions.gen_random_bytes(12), 'hex'),
+    organization_id uuid NOT NULL REFERENCES public.organizations(id),
+    requester_id uuid NOT NULL REFERENCES public.profiles(id),
     reason text NOT NULL,
     status text NOT NULL DEFAULT 'REQUESTED' CHECK (status IN (
         'REQUESTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'COMPLETED', 'CANCELLED'
     )),
     data_scope jsonb NOT NULL, -- what data to delete
-    reviewer_id text REFERENCES public.profiles(id),
+    reviewer_id uuid REFERENCES public.profiles(id),
     review_notes text,
     reviewed_at timestamptz,
     scheduled_for timestamptz,
@@ -706,7 +706,7 @@ CREATE POLICY "Data deletion requests readable by authorized users" ON app.data_
 
 -- Data deletion requests writable by platform support
 CREATE POLICY "Data deletion requests manageable by platform support" ON app.data_deletion_requests
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -721,12 +721,12 @@ CREATE POLICY "Data deletion requests manageable by platform support" ON app.dat
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS app.platform_configuration (
-    id text PRIMARY KEY DEFAULT 'cfg_' || lower(hex(random_bytes(12))),
+    id text PRIMARY KEY DEFAULT 'cfg_' || encode(extensions.gen_random_bytes(12), 'hex'),
     key text NOT NULL UNIQUE,
     value jsonb NOT NULL,
     description text,
     updated_at timestamptz NOT NULL DEFAULT now(),
-    updated_by text NOT NULL REFERENCES public.profiles(id)
+    updated_by uuid NOT NULL REFERENCES public.profiles(id)
 );
 
 COMMENT ON TABLE app.platform_configuration IS 'Platform-wide configuration settings';
@@ -748,7 +748,7 @@ CREATE POLICY "Platform configuration readable by platform admins" ON app.platfo
 
 -- Platform configuration writable by platform super admins
 CREATE POLICY "Platform configuration manageable by platform super admins" ON app.platform_configuration
-    FOR ALL TO authenticated
+    FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM app.platform_user_roles pur
@@ -794,7 +794,7 @@ AS $$
 $$;
 
 -- Check if support access session is valid
-CREATE OR REPLACE FUNCTION app.is_valid_support_access(org_id text)
+CREATE OR REPLACE FUNCTION app.is_valid_support_access(org_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE

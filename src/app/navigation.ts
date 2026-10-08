@@ -132,8 +132,8 @@ export const NAVIGATION: readonly NavGroup[] = [
       { labelKey: "nav.commerce.reservations", path: "/hotel/reservations", phase: 3, available: true },
       // Tender capture exists at the till in Phase 1; the payment *ledger* is
       // Finance, so this destination is Phase 4.
-      { labelKey: "nav.commerce.orders", phase: 1, available: false },
-      { labelKey: "nav.commerce.direct_booking", phase: 8, available: false },
+      { labelKey: "nav.commerce.orders", path: "/commerce/orders", phase: 1, available: true },
+      { labelKey: "nav.commerce.direct_booking", path: "/commerce/direct-booking", phase: 8, available: true },
     ],
   },
   {
@@ -152,17 +152,17 @@ export const NAVIGATION: readonly NavGroup[] = [
       { labelKey: "nav.inventory.wastage", path: "/inventory/wastage", phase: 2, available: true },
       { labelKey: "nav.inventory.transfers", path: "/inventory/transfers", phase: 2, available: true },
       { labelKey: "nav.inventory.stock_takes", path: "/inventory/stock-takes", phase: 2, available: true },
-      { labelKey: "nav.inventory.purchases", phase: 2, available: false },
-      { labelKey: "nav.inventory.suppliers", phase: 2, available: false },
+      { labelKey: "nav.inventory.purchases", path: "/inventory/purchases", phase: 2, available: true },
+      { labelKey: "nav.inventory.suppliers", path: "/inventory/suppliers", phase: 2, available: true },
     ],
   },
   {
     labelKey: "nav.finance",
     items: [
-      { labelKey: "nav.finance.invoices", phase: 4, available: false },
-      { labelKey: "nav.finance.payments", phase: 4, available: false },
-      { labelKey: "nav.finance.accounting", phase: 4, available: false },
-      { labelKey: "nav.finance.profit_loss", phase: 4, available: false },
+      { labelKey: "nav.finance.invoices", path: "/finance/invoices", phase: 4, available: true },
+      { labelKey: "nav.finance.payments", path: "/finance/payments", phase: 4, available: true },
+      { labelKey: "nav.finance.accounting", path: "/finance/accounting", phase: 4, available: true },
+      { labelKey: "nav.finance.profit_loss", path: "/finance/profit-loss", phase: 4, available: true },
     ],
   },
   {
@@ -220,7 +220,7 @@ export const NAVIGATION: readonly NavGroup[] = [
       { labelKey: "nav.insights.analytics_crm", path: "/analytics/crm", phase: 4, available: true },
       { labelKey: "nav.insights.analytics_hr", path: "/analytics/hr", phase: 4, available: true },
       { labelKey: "nav.insights.analytics_commerce", path: "/analytics/commerce", phase: 4, available: true },
-      { labelKey: "nav.insights.reports", phase: 4, available: false },
+      { labelKey: "nav.insights.reports", path: "/analytics/reports", phase: 4, available: true },
       // Prompt #19's AI Command Center: natural-language business intelligence.
       // Routes queries through the AI service layer with permission checks.
       { labelKey: "nav.insights.ai", path: "/ai", phase: 10, available: true },
