@@ -174,14 +174,14 @@ CREATE TABLE IF NOT EXISTS events (
   status event_status NOT NULL DEFAULT 'ENQUIRY',
   source event_source NOT NULL DEFAULT 'WALK_IN',
 
-  sales_owner_id uuid REFERENCES app.profiles(id),
+  sales_owner_id uuid REFERENCES public.profiles(id),
 
   confirmed_at timestamptz,
-  confirmed_by uuid REFERENCES app.profiles(id),
+  confirmed_by uuid REFERENCES public.profiles(id),
   confirmation_notes text,
 
   cancelled_at timestamptz,
-  cancelled_by uuid REFERENCES app.profiles(id),
+  cancelled_by uuid REFERENCES public.profiles(id),
   cancellation_reason text,
   loss_reason event_loss_reason,
 
@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS event_leads (
   venue_preference text,
 
   source event_source NOT NULL DEFAULT 'WALK_IN',
-  assigned_to uuid REFERENCES app.profiles(id),
+  assigned_to uuid REFERENCES public.profiles(id),
 
   status event_lead_status NOT NULL DEFAULT 'NEW',
   next_follow_up_at timestamptz,
@@ -256,7 +256,7 @@ CREATE TABLE IF NOT EXISTS event_quotations (
   notes text,
   terms text,
 
-  created_by uuid REFERENCES app.profiles(id),
+  created_by uuid REFERENCES public.profiles(id),
   sent_at timestamptz,
   accepted_at timestamptz,
 
@@ -334,15 +334,15 @@ CREATE TABLE IF NOT EXISTS event_tasks (
   description text,
   category event_task_category NOT NULL DEFAULT 'GENERAL',
 
-  assigned_to uuid REFERENCES app.profiles(id),
+  assigned_to uuid REFERENCES public.profiles(id),
   due_at timestamptz,
   priority event_task_priority NOT NULL DEFAULT 'NORMAL',
   status event_task_status NOT NULL DEFAULT 'TODO',
 
   completed_at timestamptz,
-  completed_by uuid REFERENCES app.profiles(id),
+  completed_by uuid REFERENCES public.profiles(id),
 
-  created_by uuid REFERENCES app.profiles(id),
+  created_by uuid REFERENCES public.profiles(id),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -359,7 +359,7 @@ CREATE TABLE IF NOT EXISTS event_schedule_items (
   title text NOT NULL,
   description text,
   department event_department NOT NULL DEFAULT 'OTHER',
-  assigned_to uuid REFERENCES app.profiles(id),
+  assigned_to uuid REFERENCES public.profiles(id),
   status text NOT NULL DEFAULT 'SCHEDULED',
 
   sort_order integer NOT NULL DEFAULT 0,
@@ -415,7 +415,7 @@ CREATE TABLE IF NOT EXISTS event_changes (
   new_value text,
   financial_impact numeric(14,2),
 
-  created_by uuid REFERENCES app.profiles(id),
+  created_by uuid REFERENCES public.profiles(id),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -436,7 +436,7 @@ CREATE TABLE IF NOT EXISTS event_payments (
 
   notes text,
 
-  created_by uuid REFERENCES app.profiles(id),
+  created_by uuid REFERENCES public.profiles(id),
   created_at timestamptz NOT NULL DEFAULT now(),
 
   CONSTRAINT uq_event_payments_number UNIQUE (organization_id, payment_number)

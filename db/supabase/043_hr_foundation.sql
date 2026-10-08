@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS employees (
   organization_id uuid NOT NULL REFERENCES organizations(id),
 
   employee_code text NOT NULL,
-  profile_id uuid REFERENCES app.profiles(id),
+  profile_id uuid REFERENCES public.profiles(id),
 
   first_name text NOT NULL,
   last_name text,
@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS shift_swaps (
   reason text,
   status shift_swap_status NOT NULL DEFAULT 'PENDING',
 
-  reviewed_by uuid REFERENCES app.profiles(id),
+  reviewed_by uuid REFERENCES public.profiles(id),
   reviewed_at timestamptz,
 
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   leave_type_id uuid,
   notes text,
 
-  corrected_by uuid REFERENCES app.profiles(id),
+  corrected_by uuid REFERENCES public.profiles(id),
   correction_reason text,
   corrected_at timestamptz,
 
@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS leave_requests (
   status leave_request_status NOT NULL DEFAULT 'PENDING',
 
   applied_on date NOT NULL DEFAULT CURRENT_DATE,
-  approved_by uuid REFERENCES app.profiles(id),
+  approved_by uuid REFERENCES public.profiles(id),
   approved_at timestamptz,
   approval_notes text,
 
@@ -333,7 +333,7 @@ CREATE TABLE IF NOT EXISTS employee_documents (
   expires_on date,
 
   notes text,
-  uploaded_by uuid REFERENCES app.profiles(id),
+  uploaded_by uuid REFERENCES public.profiles(id),
 
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()

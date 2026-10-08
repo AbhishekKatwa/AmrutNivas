@@ -197,10 +197,10 @@ ON CONFLICT DO NOTHING;
 
 -- Assign platform roles to users (separate from organization memberships)
 CREATE TABLE IF NOT EXISTS app.platform_user_roles (
-    user_id text NOT NULL REFERENCES app.profiles(id) ON DELETE CASCADE,
+    user_id text NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     platform_role_id text NOT NULL REFERENCES app.platform_roles(id) ON DELETE CASCADE,
     granted_at timestamptz NOT NULL DEFAULT now(),
-    granted_by text REFERENCES app.profiles(id),
+    granted_by text REFERENCES public.profiles(id),
     PRIMARY KEY (user_id, platform_role_id)
 );
 
@@ -261,7 +261,7 @@ CREATE TABLE IF NOT EXISTS app.support_cases (
     organization_id text REFERENCES app.organizations(id),
     property_id text REFERENCES app.properties(id),
     outlet_id text REFERENCES app.outlets(id),
-    requester_id text REFERENCES app.profiles(id),
+    requester_id text REFERENCES public.profiles(id),
     title text NOT NULL,
     description text NOT NULL,
     category text NOT NULL CHECK (category IN (
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS app.support_cases (
         'OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_FOR_CUSTOMER',
         'WAITING_INTERNAL', 'RESOLVED', 'CLOSED'
     )),
-    assigned_to text REFERENCES app.profiles(id),
+    assigned_to text REFERENCES public.profiles(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     resolved_at timestamptz
@@ -290,7 +290,7 @@ CREATE INDEX IF NOT EXISTS idx_support_cases_assigned ON app.support_cases(assig
 CREATE TABLE IF NOT EXISTS app.support_case_notes (
     id text PRIMARY KEY DEFAULT 'note_' || lower(hex(random_bytes(12))),
     case_id text NOT NULL REFERENCES app.support_cases(id) ON DELETE CASCADE,
-    author_id text NOT NULL REFERENCES app.profiles(id),
+    author_id text NOT NULL REFERENCES public.profiles(id),
     content text NOT NULL,
     visibility text NOT NULL DEFAULT 'INTERNAL' CHECK (visibility IN ('INTERNAL', 'CUSTOMER_VISIBLE')),
     created_at timestamptz NOT NULL DEFAULT now()
@@ -387,7 +387,7 @@ CREATE POLICY "Support case notes writable by platform support" ON app.support_c
 
 CREATE TABLE IF NOT EXISTS app.support_access_sessions (
     id text PRIMARY KEY DEFAULT 'sas_' || lower(hex(random_bytes(12))),
-    platform_admin_id text NOT NULL REFERENCES app.profiles(id),
+    platform_admin_id text NOT NULL REFERENCES public.profiles(id),
     organization_id text NOT NULL REFERENCES app.organizations(id),
     property_id text REFERENCES app.properties(id),
     outlet_id text REFERENCES app.outlets(id),
@@ -453,7 +453,7 @@ CREATE TABLE IF NOT EXISTS app.security_incidents (
     title text NOT NULL,
     description text,
     detected_at timestamptz NOT NULL DEFAULT now(),
-    assigned_to text REFERENCES app.profiles(id),
+    assigned_to text REFERENCES public.profiles(id),
     resolved_at timestamptz,
     resolution text,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -513,7 +513,7 @@ CREATE TABLE IF NOT EXISTS app.platform_announcements (
     target_organizations text[], -- if target_audience = SPECIFIC_ORGANIZATIONS
     start_at timestamptz NOT NULL DEFAULT now(),
     end_at timestamptz,
-    created_by text NOT NULL REFERENCES app.profiles(id),
+    created_by text NOT NULL REFERENCES public.profiles(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -617,7 +617,7 @@ CREATE POLICY "Feature flags manageable by platform super admins" ON app.feature
 CREATE TABLE IF NOT EXISTS app.data_export_requests (
     id text PRIMARY KEY DEFAULT 'exp_' || lower(hex(random_bytes(12))),
     organization_id text NOT NULL REFERENCES app.organizations(id),
-    requester_id text NOT NULL REFERENCES app.profiles(id),
+    requester_id text NOT NULL REFERENCES public.profiles(id),
     reason text NOT NULL,
     status text NOT NULL DEFAULT 'REQUESTED' CHECK (status IN (
         'REQUESTED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED'
@@ -669,13 +669,13 @@ CREATE POLICY "Data export requests manageable by platform support" ON app.data_
 CREATE TABLE IF NOT EXISTS app.data_deletion_requests (
     id text PRIMARY KEY DEFAULT 'del_' || lower(hex(random_bytes(12))),
     organization_id text NOT NULL REFERENCES app.organizations(id),
-    requester_id text NOT NULL REFERENCES app.profiles(id),
+    requester_id text NOT NULL REFERENCES public.profiles(id),
     reason text NOT NULL,
     status text NOT NULL DEFAULT 'REQUESTED' CHECK (status IN (
         'REQUESTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'COMPLETED', 'CANCELLED'
     )),
     data_scope jsonb NOT NULL, -- what data to delete
-    reviewer_id text REFERENCES app.profiles(id),
+    reviewer_id text REFERENCES public.profiles(id),
     review_notes text,
     reviewed_at timestamptz,
     scheduled_for timestamptz,
@@ -726,7 +726,7 @@ CREATE TABLE IF NOT EXISTS app.platform_configuration (
     value jsonb NOT NULL,
     description text,
     updated_at timestamptz NOT NULL DEFAULT now(),
-    updated_by text NOT NULL REFERENCES app.profiles(id)
+    updated_by text NOT NULL REFERENCES public.profiles(id)
 );
 
 COMMENT ON TABLE app.platform_configuration IS 'Platform-wide configuration settings';
