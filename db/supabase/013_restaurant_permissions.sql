@@ -52,7 +52,7 @@ begin
   -- or a typo becomes a capability nothing can grant rather than a migration-time failure.
   perform app.require_valid(
     not exists (select t from unnest(v_tokens) t
-                 where t !~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
+                 where t !~ E'^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$'),
     'NIVAAS_PERMISSION_SEED_BROKEN');
 end;
 $$;

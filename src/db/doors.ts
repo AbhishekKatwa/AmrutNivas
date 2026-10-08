@@ -207,6 +207,51 @@ export const CLIENT_DOORS = [
   "allocate_payment_to_invoice",
   "create_purchase_return",
   "post_purchase_return",
+  // hotel guest management (033) — guests and their identity documents.
+  // PII protection: document numbers never appear in audit metadata.
+  "create_guest",
+  "update_guest",
+  "archive_guest",
+  "create_guest_document",
+  "update_guest_document",
+  "delete_guest_document",
+  // hotel room types, rooms, amenities & blocks (034) — physical inventory.
+  // Two orthogonal statuses on rooms: operational_status and housekeeping_status.
+  "create_room_type",
+  "update_room_type",
+  "archive_room_type",
+  "create_amenity",
+  "update_amenity",
+  "create_room",
+  "update_room",
+  "set_room_operational_status",
+  "set_room_housekeeping_status",
+  "archive_room",
+  "create_room_block",
+  "update_room_block",
+  "remove_room_block",
+  // hotel reservations (036) — bookings with state machine.
+  // INQUIRY → TENTATIVE → CONFIRMED → CHECKED_IN → CHECKED_OUT.
+  "create_reservation",
+  "update_reservation",
+  "confirm_reservation",
+  "cancel_reservation",
+  "mark_no_show",
+  "assign_room",
+  // hotel stays (037) — actual occupancy, created at check-in.
+  "check_in",
+  "check_out",
+  "extend_stay",
+  "move_room",
+  "add_stay_guest",
+  // hotel folios & charges (038) — immutable financial ledger for stays.
+  // Corrections use compensating entries, never edits.
+  "open_folio",
+  "post_folio_charge",
+  "post_folio_payment",
+  "void_folio_entry",
+  "settle_folio",
+  "close_folio",
 ] as const;
 
 export type DoorName = (typeof CLIENT_DOORS)[number];

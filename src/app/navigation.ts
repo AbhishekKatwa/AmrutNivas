@@ -70,7 +70,12 @@ export const NAVIGATION: readonly NavGroup[] = [
   {
     labelKey: "nav.operations",
     items: [
-      { labelKey: "nav.operations.hotel", phase: 3, available: false },
+      // Prompt #08's hotel surface: front desk, room types, rooms, and guests.
+      // Each reads real tables and writes through 034–038 doors.
+      { labelKey: "nav.operations.hotel", path: "/hotel/front-desk", phase: 3, available: true },
+      { labelKey: "nav.operations.room_types", path: "/hotel/room-types", phase: 3, available: true },
+      { labelKey: "nav.operations.rooms", path: "/hotel/rooms", phase: 3, available: true },
+      { labelKey: "nav.operations.guests", path: "/hotel/guests", phase: 3, available: true },
       // Prompt #04's first shipped surface: the menu of the active outlet, read and
       // written through 014's doors.
       { labelKey: "nav.operations.menu", path: "/menu", phase: 1, available: true },
@@ -94,7 +99,9 @@ export const NAVIGATION: readonly NavGroup[] = [
   {
     labelKey: "nav.commerce",
     items: [
-      { labelKey: "nav.commerce.reservations", phase: 3, available: false },
+      // Prompt #08's reservation surface: the booking ledger as the database reads it,
+      // with state transitions (confirm, cancel, no-show) and room assignment.
+      { labelKey: "nav.commerce.reservations", path: "/hotel/reservations", phase: 3, available: true },
       // Tender capture exists at the till in Phase 1; the payment *ledger* is
       // Finance, so this destination is Phase 4.
       { labelKey: "nav.commerce.orders", phase: 1, available: false },
@@ -104,8 +111,19 @@ export const NAVIGATION: readonly NavGroup[] = [
   {
     labelKey: "nav.inventory",
     items: [
-      { labelKey: "nav.inventory.stock", phase: 2, available: false },
-      { labelKey: "nav.inventory.recipes", phase: 2, available: false },
+      // Prompt #06's inventory surface: overview, master data, stock, movements,
+      // locations, recipes, wastage, transfers and stock takes. Each reads real
+      // tables and writes through 023/024 doors. Purchases and suppliers remain
+      // unavailable until Prompt #07's procurement domain lands.
+      { labelKey: "nav.inventory.overview", path: "/inventory", phase: 2, available: true },
+      { labelKey: "nav.inventory.items", path: "/inventory/items", phase: 2, available: true },
+      { labelKey: "nav.inventory.stock", path: "/inventory/stock", phase: 2, available: true },
+      { labelKey: "nav.inventory.movements", path: "/inventory/movements", phase: 2, available: true },
+      { labelKey: "nav.inventory.locations", path: "/inventory/locations", phase: 2, available: true },
+      { labelKey: "nav.inventory.recipes", path: "/inventory/recipes", phase: 2, available: true },
+      { labelKey: "nav.inventory.wastage", path: "/inventory/wastage", phase: 2, available: true },
+      { labelKey: "nav.inventory.transfers", path: "/inventory/transfers", phase: 2, available: true },
+      { labelKey: "nav.inventory.stock_takes", path: "/inventory/stock-takes", phase: 2, available: true },
       { labelKey: "nav.inventory.purchases", phase: 2, available: false },
       { labelKey: "nav.inventory.suppliers", phase: 2, available: false },
     ],

@@ -34,8 +34,8 @@ create or replace function public.record_wastage(
   p_quantity        numeric,
   p_unit            uuid,
   p_reason          text,
-  p_notes           text default null,
-  p_idempotency_key text
+  p_idempotency_key text,
+  p_notes           text default null
 )
 returns uuid
 language plpgsql
@@ -89,8 +89,8 @@ create or replace function public.record_adjustment(
   p_unit            uuid,
   p_adjustment_type text, -- 'IN' or 'OUT'
   p_reason          text,
-  p_notes           text default null,
-  p_idempotency_key text
+  p_idempotency_key text,
+  p_notes           text default null
 )
 returns uuid
 language plpgsql
@@ -110,10 +110,13 @@ begin
     raise exception 'NIVAAS_FORBIDDEN' using errcode = '28000';
   end if;
 
+  if p_adjustment_type not in ('IN', 'OUT') then
+    raise exception 'NIVAAS_INVALID_OPERATION: adjustment_type must be IN or OUT';
+  end if;
+
   v_movement_type := case p_adjustment_type
     when 'IN'  then 'ADJUSTMENT_IN'
     when 'OUT' then 'ADJUSTMENT_OUT'
-    else raise exception 'NIVAAS_INVALID_OPERATION: adjustment_type must be IN or OUT'
   end;
 
   v_ledger_id := public.post_stock_movement(
@@ -152,9 +155,9 @@ create or replace function public.record_transfer(
   p_item              uuid,
   p_quantity          numeric,
   p_unit              uuid,
+  p_idempotency_key   text,
   p_reason            text default null,
-  p_notes             text default null,
-  p_idempotency_key   text
+  p_notes             text default null
 )
 returns uuid
 language plpgsql
@@ -589,9 +592,9 @@ create or replace function public.set_opening_stock(
   p_quantity        numeric,
   p_unit            uuid,
   p_unit_cost       numeric,
+  p_idempotency_key text,
   p_batch_number    text default null,
-  p_expiry_date     date default null,
-  p_idempotency_key text
+  p_expiry_date     date default null
 )
 returns uuid
 language plpgsql

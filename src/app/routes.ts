@@ -38,6 +38,13 @@ import WastagePage from "@/pages/inventory/WastagePage";
 import TransfersPage from "@/pages/inventory/TransfersPage";
 import StockTakesPage from "@/pages/inventory/StockTakesPage";
 import InventoryOverviewPage from "@/pages/inventory/InventoryOverviewPage";
+import RoomTypesPage from "@/pages/hotel/RoomTypesPage";
+import RoomsPage from "@/pages/hotel/RoomsPage";
+import ReservationsPage from "@/pages/hotel/ReservationsPage";
+import ReservationDetailPage from "@/pages/hotel/ReservationDetailPage";
+import FrontDeskPage from "@/pages/hotel/FrontDeskPage";
+import StayDetailPage from "@/pages/hotel/StayDetailPage";
+import GuestsPage from "@/pages/hotel/GuestsPage";
 
 export type AppRoute = {
   readonly path: string;
@@ -81,6 +88,13 @@ export const ROUTES: readonly AppRoute[] = [
   { path: "/inventory/wastage", component: WastagePage, permission: "stock.view" },
   { path: "/inventory/transfers", component: TransfersPage, permission: "stock.view" },
   { path: "/inventory/stock-takes", component: StockTakesPage, permission: "stock.view" },
+  { path: "/hotel/room-types", component: RoomTypesPage, permission: "room_type.view" },
+  { path: "/hotel/rooms", component: RoomsPage, permission: "room.view" },
+  { path: "/hotel/reservations", component: ReservationsPage, permission: "reservation.view" },
+  { path: "/hotel/reservations/:reservationId", component: ReservationDetailPage, permission: "reservation.view" },
+  { path: "/hotel/front-desk", component: FrontDeskPage, permission: "reservation.view" },
+  { path: "/hotel/stays/:stayId", component: StayDetailPage, permission: "stay.view" },
+  { path: "/hotel/guests", component: GuestsPage, permission: "guest.view" },
 ];
 
 /**

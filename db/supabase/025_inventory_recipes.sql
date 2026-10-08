@@ -221,9 +221,9 @@ create or replace function public.create_recipe(
   p_item          uuid,
   p_name          text,
   p_code          text,
+  p_yield_unit    uuid,
   p_description   text default null,
   p_yield_qty     numeric default 1,
-  p_yield_unit    uuid,
   p_notes         text default null,
   p_ingredients   jsonb default '[]'::jsonb
 )
@@ -396,7 +396,7 @@ begin
     raise exception 'NIVAAS_NOT_FOUND' using errcode = 'P0001';
   end if;
 
-  if not app.has_permission(v_user_id, v_recipe_org, 'recipe.cost.view') then
+  if not app.has_permission(v_user_id, v_recipe_org, 'recipe_cost.view') then
     raise exception 'NIVAAS_FORBIDDEN' using errcode = '28000';
   end if;
 

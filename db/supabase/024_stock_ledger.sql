@@ -150,14 +150,7 @@ from public.stock_ledger l
 group by l.organization_id, l.property_id, l.outlet_id, l.item_id, l.location_id, l.unit_id;
 
 comment on view public.stock_balance is
-  'Derived stock balance per (item, location). Read model, never written to directly.';
-
-drop policy if exists stock_balance_select on public.stock_balance;
-create policy stock_balance_select on public.stock_balance
-  for select to authenticated
-  using (
-    app.member_of(app.current_user_id(), organization_id)
-  );
+  'Derived stock balance per (item, location). Read model, never written to directly. Access controlled by underlying stock_ledger RLS.';
 
 -- ============================================================ post_stock_movement door
 
@@ -172,10 +165,10 @@ create or replace function public.post_stock_movement(
   p_movement_type     text,
   p_quantity          numeric,
   p_unit              uuid,
+  p_idempotency_key   text,
   p_unit_cost         numeric default null,
   p_document_type     text default null,
   p_document_id       uuid default null,
-  p_idempotency_key   text,
   p_batch_number      text default null,
   p_expiry_date       date default null,
   p_reason            text default null,
@@ -351,6 +344,10 @@ begin
   end if;
 
   -- Determine reverse movement type.
+  if v_original.movement_type not in ('OPENING', 'RECEIPT', 'TRANSFER_IN', 'TRANSFER_OUT', 'CONSUMPTION', 'WASTAGE', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT', 'RETURN') then
+    raise exception 'NIVAAS_INVALID_OPERATION: cannot reverse movement type %', v_original.movement_type;
+  end if;
+
   v_reverse_type := case v_original.movement_type
     when 'OPENING'        then 'ADJUSTMENT_OUT'
     when 'RECEIPT'        then 'ADJUSTMENT_OUT'
@@ -361,7 +358,6 @@ begin
     when 'ADJUSTMENT_IN'  then 'ADJUSTMENT_OUT'
     when 'ADJUSTMENT_OUT' then 'ADJUSTMENT_IN'
     when 'RETURN'         then 'ADJUSTMENT_OUT'
-    else raise exception 'NIVAAS_INVALID_OPERATION: cannot reverse movement type %', v_original.movement_type
   end;
 
   -- Post the reverse movement.

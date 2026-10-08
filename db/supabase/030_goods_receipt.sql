@@ -166,9 +166,9 @@ $$;
 create or replace function public.create_goods_receipt(
   p_organization       uuid,
   p_property           uuid,
-  p_outlet             uuid default null,
   p_purchase_order     uuid,
   p_location           uuid,
+  p_outlet             uuid default null,
   p_notes              text default null
 )
 returns jsonb

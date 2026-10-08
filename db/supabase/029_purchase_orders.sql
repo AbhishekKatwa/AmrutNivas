@@ -472,8 +472,8 @@ $$;
 create or replace function public.create_purchase_order(
   p_organization       uuid,
   p_property           uuid,
-  p_outlet             uuid default null,
   p_supplier           uuid,
+  p_outlet             uuid default null,
   p_order_date         date default null,
   p_expected_delivery  date default null,
   p_currency           text default 'INR',

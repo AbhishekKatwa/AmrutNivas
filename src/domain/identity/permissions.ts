@@ -36,6 +36,23 @@ export type PermissionDomain =
   | "kot"
   | "bill"
   | "payment"
+  | "inventory"
+  | "item"
+  | "location"
+  | "stock"
+  | "wastage"
+  | "transfer"
+  | "stocktake"
+  | "recipe"
+  | "consumption"
+  | "procurement"
+  | "supplier"
+  | "purchase_request"
+  | "purchase_order"
+  | "goods_receipt"
+  | "purchase_invoice"
+  | "supplier_payment"
+  | "purchase_return"
   | "user"
   | "role"
   | "audit"
@@ -412,6 +429,388 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
     verb: "manage",
     description:
       "Operate the AMRUT NIVAAS platform itself, including administration of any tenant.",
+  },
+
+  // ------------------------------------------------------------------- inventory
+  // Prompt #06's inventory domain (022): items, locations, stock ledger, recipes,
+  // consumption, wastage, transfers, stock takes. Cost visibility is sensitive.
+  {
+    key: "inventory.view",
+    domain: "inventory",
+    verb: "view",
+    description: "Open the inventory module for the locations you can reach.",
+  },
+  {
+    key: "inventory_cost.view",
+    domain: "inventory",
+    verb: "view",
+    description: "See unit costs, average costs and total stock values in the inventory.",
+  },
+  {
+    key: "item.view",
+    domain: "item",
+    verb: "view",
+    description: "See the inventory items: names, codes, categories and units.",
+  },
+  {
+    key: "item.create",
+    domain: "item",
+    verb: "create",
+    description: "Add a new item to the inventory catalogue.",
+  },
+  {
+    key: "item.edit",
+    domain: "item",
+    verb: "edit",
+    description: "Change an item's details, category, unit or reorder settings.",
+  },
+  {
+    key: "item.archive",
+    domain: "item",
+    verb: "archive",
+    description: "Retire an item so it can no longer be received or consumed.",
+  },
+  {
+    key: "location.view",
+    domain: "location",
+    verb: "view",
+    description: "See the stores, kitchens, bars and other stock locations.",
+  },
+  {
+    key: "location.create",
+    domain: "location",
+    verb: "create",
+    description: "Add a new stock location to a property or outlet.",
+  },
+  {
+    key: "location.edit",
+    domain: "location",
+    verb: "edit",
+    description: "Change a location's name, type or description.",
+  },
+  {
+    key: "location.archive",
+    domain: "location",
+    verb: "archive",
+    description: "Retire a location so no further stock movements target it.",
+  },
+  {
+    key: "stock.view",
+    domain: "stock",
+    verb: "view",
+    description: "See stock balances and the movements that built them.",
+  },
+  {
+    key: "stock.adjust",
+    domain: "stock",
+    verb: "adjust",
+    description: "Post a stock adjustment to correct a balance in the ledger.",
+  },
+  {
+    key: "wastage.create",
+    domain: "wastage",
+    verb: "create",
+    description: "Record stock wastage, reducing the balance for a recorded reason.",
+  },
+  {
+    key: "transfer.create",
+    domain: "transfer",
+    verb: "create",
+    description: "Move stock between two locations, posting to the ledger.",
+  },
+  {
+    key: "stocktake.view",
+    domain: "stocktake",
+    verb: "view",
+    description: "See stock takes and their counted versus expected quantities.",
+  },
+  {
+    key: "stocktake.create",
+    domain: "stocktake",
+    verb: "create",
+    description: "Start a new stock take for a location.",
+  },
+  {
+    key: "stocktake.post",
+    domain: "stocktake",
+    verb: "post",
+    description:
+      "Post a completed stock take, writing the variances into the ledger.",
+  },
+  {
+    key: "recipe.view",
+    domain: "recipe",
+    verb: "view",
+    description: "See recipes and their ingredient formulas.",
+  },
+  {
+    key: "recipe.create",
+    domain: "recipe",
+    verb: "create",
+    description: "Create a new recipe linking a menu item to its ingredients.",
+  },
+  {
+    key: "recipe.edit",
+    domain: "recipe",
+    verb: "edit",
+    description: "Change a recipe's ingredients, yield or notes.",
+  },
+  {
+    key: "recipe.activate",
+    domain: "recipe",
+    verb: "activate",
+    description: "Activate a recipe version so it is the one consumption uses.",
+  },
+  {
+    key: "recipe_cost.view",
+    domain: "recipe",
+    verb: "view",
+    description: "See the calculated cost of a recipe from its ingredient formula.",
+  },
+  {
+    key: "consumption.view",
+    domain: "consumption",
+    verb: "view",
+    description: "See the stock an order or recipe consumed from the ledger.",
+  },
+
+  // ----------------------------------------------------------------- procurement
+  // Prompt #07's procurement domain (027): suppliers, purchase requests, purchase
+  // orders, goods receipt, invoices, payments and returns. Cost visibility and
+  // landed-cost management are sensitive; write verbs stop at manager level.
+  {
+    key: "procurement.view",
+    domain: "procurement",
+    verb: "view",
+    description: "Open the procurement module.",
+  },
+  {
+    key: "procurement_cost.view",
+    domain: "procurement",
+    verb: "view",
+    description: "See purchase prices, totals and cost breakdowns in procurement.",
+  },
+  {
+    key: "procurement_landed_cost.manage",
+    domain: "procurement",
+    verb: "manage",
+    description: "Allocate freight, duty and other landed costs onto receipts.",
+  },
+  {
+    key: "procurement_supplier_price.view",
+    domain: "procurement",
+    verb: "view",
+    description: "See the prices individual suppliers charge for items.",
+  },
+  {
+    key: "supplier.view",
+    domain: "supplier",
+    verb: "view",
+    description: "See the supplier list and their contact details.",
+  },
+  {
+    key: "supplier.create",
+    domain: "supplier",
+    verb: "create",
+    description: "Add a new supplier to the organization.",
+  },
+  {
+    key: "supplier.edit",
+    domain: "supplier",
+    verb: "edit",
+    description: "Change a supplier's details, terms or contact information.",
+  },
+  {
+    key: "supplier.archive",
+    domain: "supplier",
+    verb: "archive",
+    description: "Retire a supplier so no new orders target them.",
+  },
+  {
+    key: "purchase_request.view",
+    domain: "purchase_request",
+    verb: "view",
+    description: "See purchase requests and their approval status.",
+  },
+  {
+    key: "purchase_request.create",
+    domain: "purchase_request",
+    verb: "create",
+    description: "Raise a new purchase request for goods or services.",
+  },
+  {
+    key: "purchase_request.edit",
+    domain: "purchase_request",
+    verb: "edit",
+    description: "Change a purchase request before it is submitted.",
+  },
+  {
+    key: "purchase_request.submit",
+    domain: "purchase_request",
+    verb: "submit",
+    description: "Submit a purchase request for approval.",
+  },
+  {
+    key: "purchase_request.approve",
+    domain: "purchase_request",
+    verb: "approve",
+    description: "Approve a purchase request so it can become an order.",
+  },
+  {
+    key: "purchase_request.reject",
+    domain: "purchase_request",
+    verb: "reject",
+    description: "Reject a purchase request with a recorded reason.",
+  },
+  {
+    key: "purchase_order.view",
+    domain: "purchase_order",
+    verb: "view",
+    description: "See purchase orders and their delivery status.",
+  },
+  {
+    key: "purchase_order.create",
+    domain: "purchase_order",
+    verb: "create",
+    description: "Create a purchase order against an approved request.",
+  },
+  {
+    key: "purchase_order.edit",
+    domain: "purchase_order",
+    verb: "edit",
+    description: "Change a purchase order before it is sent to the supplier.",
+  },
+  {
+    key: "purchase_order.submit",
+    domain: "purchase_order",
+    verb: "submit",
+    description: "Submit a purchase order for internal approval.",
+  },
+  {
+    key: "purchase_order.approve",
+    domain: "purchase_order",
+    verb: "approve",
+    description: "Approve a purchase order so it may be sent.",
+  },
+  {
+    key: "purchase_order.send",
+    domain: "purchase_order",
+    verb: "send",
+    description: "Send an approved purchase order to the supplier.",
+  },
+  {
+    key: "purchase_order.cancel",
+    domain: "purchase_order",
+    verb: "cancel",
+    description: "Cancel a purchase order with a recorded reason.",
+  },
+  {
+    key: "purchase_order.close",
+    domain: "purchase_order",
+    verb: "close",
+    description: "Close a purchase order after all receipts are complete.",
+  },
+  {
+    key: "goods_receipt.view",
+    domain: "goods_receipt",
+    verb: "view",
+    description: "See goods receipts and what was received against each order.",
+  },
+  {
+    key: "goods_receipt.create",
+    domain: "goods_receipt",
+    verb: "create",
+    description: "Record the receipt of goods against a purchase order.",
+  },
+  {
+    key: "goods_receipt.edit",
+    domain: "goods_receipt",
+    verb: "edit",
+    description: "Change a goods receipt before it is posted.",
+  },
+  {
+    key: "goods_receipt.post",
+    domain: "goods_receipt",
+    verb: "post",
+    description: "Post a goods receipt, writing the stock into the ledger.",
+  },
+  {
+    key: "goods_receipt.cancel",
+    domain: "goods_receipt",
+    verb: "cancel",
+    description: "Cancel a posted goods receipt, reversing the stock movement.",
+  },
+  {
+    key: "purchase_invoice.view",
+    domain: "purchase_invoice",
+    verb: "view",
+    description: "See purchase invoices and their payment status.",
+  },
+  {
+    key: "purchase_invoice.create",
+    domain: "purchase_invoice",
+    verb: "create",
+    description: "Create a purchase invoice against a goods receipt or order.",
+  },
+  {
+    key: "purchase_invoice.edit",
+    domain: "purchase_invoice",
+    verb: "edit",
+    description: "Change a purchase invoice before it is posted.",
+  },
+  {
+    key: "purchase_invoice.post",
+    domain: "purchase_invoice",
+    verb: "post",
+    description: "Post a purchase invoice into the accounts payable ledger.",
+  },
+  {
+    key: "purchase_invoice.cancel",
+    domain: "purchase_invoice",
+    verb: "cancel",
+    description: "Cancel a posted purchase invoice with a recorded reason.",
+  },
+  {
+    key: "supplier_payment.view",
+    domain: "supplier_payment",
+    verb: "view",
+    description: "See payments made to suppliers.",
+  },
+  {
+    key: "supplier_payment.create",
+    domain: "supplier_payment",
+    verb: "create",
+    description: "Record a payment to a supplier against their invoices.",
+  },
+  {
+    key: "supplier_payment.edit",
+    domain: "supplier_payment",
+    verb: "edit",
+    description: "Change a supplier payment before it is finalised.",
+  },
+  {
+    key: "supplier_payment.cancel",
+    domain: "supplier_payment",
+    verb: "cancel",
+    description: "Cancel a supplier payment with a recorded reason.",
+  },
+  {
+    key: "purchase_return.view",
+    domain: "purchase_return",
+    verb: "view",
+    description: "See purchase returns and their status.",
+  },
+  {
+    key: "purchase_return.create",
+    domain: "purchase_return",
+    verb: "create",
+    description: "Create a return of goods to a supplier.",
+  },
+  {
+    key: "purchase_return.post",
+    domain: "purchase_return",
+    verb: "post",
+    description: "Post a purchase return, reversing the stock and payable.",
   },
 ];
 

@@ -353,6 +353,7 @@ $$;
 create or replace function public.update_supplier(
   p_supplier           uuid,
   p_organization       uuid,
+  p_expected_version   integer,
   p_legal_name         text default null,
   p_display_name       text default null,
   p_supplier_type      text default null,
@@ -365,8 +366,7 @@ create or replace function public.update_supplier(
   p_payment_terms_days integer default null,
   p_credit_limit       numeric default null,
   p_currency           text default null,
-  p_notes              text default null,
-  p_expected_version   integer
+  p_notes              text default null
 )
 returns jsonb
 language plpgsql
@@ -627,8 +627,8 @@ $$;
 create or replace function public.create_supplier_address(
   p_supplier           uuid,
   p_organization       uuid,
-  p_address_type       text default 'OTHER',
   p_address_line1      text,
+  p_address_type       text default 'OTHER',
   p_address_line2      text default null,
   p_city               text default null,
   p_state              text default null,
@@ -881,12 +881,12 @@ create or replace function public.record_supplier_price(
   p_supplier           uuid,
   p_organization       uuid,
   p_inventory_item     uuid,
-  p_purchase_order_id  uuid default null,
-  p_goods_receipt_id   uuid default null,
   p_purchase_date      date,
   p_quantity           numeric,
   p_purchase_unit      uuid,
   p_rate               numeric,
+  p_purchase_order_id  uuid default null,
+  p_goods_receipt_id   uuid default null,
   p_discount           numeric default 0,
   p_tax_amount         numeric default 0,
   p_freight_amount     numeric default 0,
