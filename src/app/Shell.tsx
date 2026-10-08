@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import clsx from "clsx";
 import {
   BarChart3,
+  Bell,
   Building2,
   CheckCircle2,
   LogOut,
@@ -35,6 +36,7 @@ const GROUP_ICONS: Record<string, ReactNode> = {
   "nav.people": <Users />,
   "nav.insights": <BarChart3 />,
   "nav.administration": <Building2 />,
+  "nav.notifications": <Bell />,
 };
 
 /**

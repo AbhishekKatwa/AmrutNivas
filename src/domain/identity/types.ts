@@ -39,8 +39,12 @@ export type EntityId = string;
 /** The tenant's own lifecycle. There is no `INACTIVE`: a group is trading or not. */
 export type OrganizationStatus = "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 
-/** A site, outlet or department can be paused without being retired. */
-export type SiteStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
+/**
+ * A site, outlet or department can be paused without being retired.
+ * 045 extended property status with TEMPORARILY_CLOSED, COMING_SOON, SUSPENDED
+ * for enterprise visibility. Outlets and departments still use the original three.
+ */
+export type SiteStatus = "ACTIVE" | "INACTIVE" | "TEMPORARILY_CLOSED" | "COMING_SOON" | "SUSPENDED" | "ARCHIVED";
 
 /** A person's standing inside one organization. `REMOVED` is terminal. */
 export type MembershipStatus = "INVITED" | "ACTIVE" | "SUSPENDED" | "REMOVED";
@@ -74,6 +78,7 @@ export type PropertyType =
   | "BANQUET"
   | "CONVENTION_CENTER"
   | "RESTAURANT_HOTEL"
+  | "MIXED_HOSPITALITY"
   | "OTHER";
 
 export type OutletType =
@@ -105,7 +110,7 @@ export const ORGANIZATION_STATUSES: readonly OrganizationStatus[] = [
   "ARCHIVED",
 ];
 
-export const SITE_STATUSES: readonly SiteStatus[] = ["ACTIVE", "INACTIVE", "ARCHIVED"];
+export const SITE_STATUSES: readonly SiteStatus[] = ["ACTIVE", "INACTIVE", "TEMPORARILY_CLOSED", "COMING_SOON", "SUSPENDED", "ARCHIVED"];
 
 export const MEMBERSHIP_STATUSES: readonly MembershipStatus[] = [
   "INVITED",

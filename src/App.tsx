@@ -5,7 +5,7 @@ import { Shell } from "@/app/Shell";
 import { AccessDebugPanel } from "@/app/AccessDebugPanel";
 import { GuardedRoute } from "@/app/RouteGuard";
 import { notImplementedLabel } from "@/app/navigation";
-import { ROUTES, SIGN_IN_ROUTE } from "@/app/routes";
+import { ROUTES, SIGN_IN_ROUTE, PUBLIC_ROUTES } from "@/app/routes";
 import { useSyncContextWithUrl } from "@/app/context-url";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -103,24 +103,42 @@ function Workspace() {
   useEffect(() => startSessionSync(), []);
   useSyncContextWithUrl();
 
-  if (status === "unauthenticated") return <SignInOnly />;
-  if (status === "access-lost") return <AccessLostScreen />;
-
   return (
-    <Shell>
+    <>
       <Routes>
-        {/* Mounted here too so a signed-in browser at /sign-in resolves: the link
-            landing page works while the session is being consumed. */}
-        <Route path={SIGN_IN_ROUTE.path} element={<SignInRouteElement />} />
-        {ROUTES.map((route) => (
-          <Route key={route.path} path={route.path} element={<GuardedRoute route={route} />} />
+        {/* Public routes — no auth required, no shell. Mounted first so they take
+            precedence over the auth gate. */}
+        {PUBLIC_ROUTES.map((route) => (
+          <Route key={route.path} path={route.path} element={<route.component />} />
         ))}
-        <Route path="*" element={<NotImplementedRoute />} />
+        {/* Everything below requires authentication. */}
+        {status === "unauthenticated" ? (
+          <Route path="*" element={<SignInOnly />} />
+        ) : status === "access-lost" ? (
+          <Route path="*" element={<AccessLostScreen />} />
+        ) : (
+          <Route
+            path="*"
+            element={
+              <Shell>
+                <Routes>
+                  {/* Mounted here too so a signed-in browser at /sign-in resolves: the link
+                      landing page works while the session is being consumed. */}
+                  <Route path={SIGN_IN_ROUTE.path} element={<SignInRouteElement />} />
+                  {ROUTES.map((route) => (
+                    <Route key={route.path} path={route.path} element={<GuardedRoute route={route} />} />
+                  ))}
+                  <Route path="*" element={<NotImplementedRoute />} />
+                </Routes>
+                {/* §67: the access inspector. Vite replaces `import.meta.env.DEV` with `false` in a
+                    production build, so this expression disappears and the module is never referenced. */}
+                {import.meta.env.DEV && <AccessDebugPanel />}
+              </Shell>
+            }
+          />
+        )}
       </Routes>
-      {/* §67: the access inspector. Vite replaces `import.meta.env.DEV` with `false` in a
-          production build, so this expression disappears and the module is never referenced. */}
-      {import.meta.env.DEV && <AccessDebugPanel />}
-    </Shell>
+    </>
   );
 }
 

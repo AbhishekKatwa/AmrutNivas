@@ -92,13 +92,28 @@ export const NAVIGATION: readonly NavGroup[] = [
       // 019's single door: the trading day as the database reads it — covers, tickets, the pass,
       // and money per currency. The screen sums nothing, so the day cannot disagree with the till.
       { labelKey: "nav.operations.restaurant", path: "/restaurant", phase: 1, available: true },
-      { labelKey: "nav.operations.housekeeping", phase: 3, available: false },
-      { labelKey: "nav.operations.events", phase: 6, available: false },
+      { labelKey: "nav.operations.housekeeping", path: "/hotel/housekeeping", phase: 3, available: true },
+      { labelKey: "nav.operations.maintenance", path: "/hotel/maintenance", phase: 3, available: true },
+      { labelKey: "nav.operations.lost_found", path: "/hotel/lost-found", phase: 3, available: true },
+      { labelKey: "nav.operations.assets", path: "/hotel/assets", phase: 3, available: true },
+      // Prompt #12's events surface: overview, leads, events list, venues, and the
+      // 360° detail workspace. Each reads real tables and writes through 042 doors.
+      { labelKey: "nav.operations.events", path: "/events", phase: 6, available: true },
+      { labelKey: "nav.operations.event_leads", path: "/events/leads", phase: 6, available: true },
+      { labelKey: "nav.operations.events_list", path: "/events/list", phase: 6, available: true },
+      { labelKey: "nav.operations.event_venues", path: "/events/venues", phase: 6, available: true },
     ],
   },
   {
     labelKey: "nav.commerce",
     items: [
+      // Prompt #14's commerce surface: overview, channels, QR codes, table requests,
+      // and settings. Each reads real tables and writes through 044 doors.
+      { labelKey: "nav.commerce.overview", path: "/commerce", phase: 8, available: true },
+      { labelKey: "nav.commerce.channels", path: "/commerce/channels", phase: 8, available: true },
+      { labelKey: "nav.commerce.qr_codes", path: "/commerce/qr-codes", phase: 8, available: true },
+      { labelKey: "nav.commerce.table_requests", path: "/commerce/table-requests", phase: 8, available: true },
+      { labelKey: "nav.commerce.settings", path: "/commerce/settings", phase: 8, available: true },
       // Prompt #08's reservation surface: the booking ledger as the database reads it,
       // with state transitions (confirm, cancel, no-show) and room assignment.
       { labelKey: "nav.commerce.reservations", path: "/hotel/reservations", phase: 3, available: true },
@@ -138,18 +153,64 @@ export const NAVIGATION: readonly NavGroup[] = [
     ],
   },
   {
+    labelKey: "nav.crm",
+    items: [
+      // Prompt #11's CRM surface: overview, customers, feedback, complaints, loyalty,
+      // and corporate accounts. Each reads real tables and writes through 041 doors.
+      { labelKey: "nav.crm.overview", path: "/crm", phase: 5, available: true },
+      { labelKey: "nav.crm.customers", path: "/crm/customers", phase: 5, available: true },
+      { labelKey: "nav.crm.feedback", path: "/crm/feedback", phase: 5, available: true },
+      { labelKey: "nav.crm.complaints", path: "/crm/complaints", phase: 5, available: true },
+      { labelKey: "nav.crm.loyalty", path: "/crm/loyalty", phase: 5, available: true },
+      { labelKey: "nav.crm.corporate", path: "/crm/corporate", phase: 5, available: true },
+    ],
+  },
+  {
     labelKey: "nav.people",
     items: [
-      { labelKey: "nav.people.guests", phase: 5, available: false },
-      { labelKey: "nav.people.employees", phase: 7, available: false },
+      // Prompt #13's HR surface: overview, employees, attendance, shifts, roster and leave.
+      // Each reads real tables and writes through 043 doors.
+      { labelKey: "nav.people.overview", path: "/hr", phase: 7, available: true },
+      { labelKey: "nav.people.employees", path: "/hr/employees", phase: 7, available: true },
+      { labelKey: "nav.people.attendance", path: "/hr/attendance", phase: 7, available: true },
+      { labelKey: "nav.people.shifts", path: "/hr/shifts", phase: 7, available: true },
+      { labelKey: "nav.people.roster", path: "/hr/roster", phase: 7, available: true },
+      { labelKey: "nav.people.leave", path: "/hr/leave", phase: 7, available: true },
+    ],
+  },
+  {
+    labelKey: "nav.enterprise",
+    items: [
+      // Prompt #15's enterprise surface: command center, properties with groups,
+      // attention center, search, reports, and org settings. Each reads real tables
+      // and writes through 045 doors.
+      { labelKey: "nav.enterprise.overview", path: "/enterprise", phase: 9, available: true },
+      { labelKey: "nav.enterprise.properties", path: "/enterprise/properties", phase: 9, available: true },
+      { labelKey: "nav.enterprise.attention", path: "/enterprise/attention", phase: 9, available: true },
+      { labelKey: "nav.enterprise.search", path: "/enterprise/search", phase: 9, available: true },
+      { labelKey: "nav.enterprise.reports", path: "/enterprise/reports", phase: 9, available: true },
+      { labelKey: "nav.enterprise.settings", path: "/enterprise/settings", phase: 9, available: true },
     ],
   },
   {
     labelKey: "nav.insights",
     items: [
-      { labelKey: "nav.insights.analytics", phase: 4, available: false },
+      // Prompt #18's analytics surface: owner command center with KPIs, trends,
+      // change detection, attention center, and domain-specific analytics.
+      // Reads from existing operational tables; no competing calculations.
+      { labelKey: "nav.insights.analytics", path: "/analytics", phase: 4, available: true },
+      { labelKey: "nav.insights.analytics_restaurant", path: "/analytics/restaurant", phase: 4, available: true },
+      { labelKey: "nav.insights.analytics_hotel", path: "/analytics/hotel", phase: 4, available: true },
+      { labelKey: "nav.insights.analytics_inventory", path: "/analytics/inventory", phase: 4, available: true },
+      { labelKey: "nav.insights.analytics_finance", path: "/analytics/finance", phase: 4, available: true },
+      { labelKey: "nav.insights.analytics_events", path: "/analytics/events", phase: 4, available: true },
+      { labelKey: "nav.insights.analytics_crm", path: "/analytics/crm", phase: 4, available: true },
+      { labelKey: "nav.insights.analytics_hr", path: "/analytics/hr", phase: 4, available: true },
+      { labelKey: "nav.insights.analytics_commerce", path: "/analytics/commerce", phase: 4, available: true },
       { labelKey: "nav.insights.reports", phase: 4, available: false },
-      { labelKey: "nav.insights.ai", phase: 10, available: false },
+      // Prompt #19's AI Command Center: natural-language business intelligence.
+      // Routes queries through the AI service layer with permission checks.
+      { labelKey: "nav.insights.ai", path: "/ai", phase: 10, available: true },
     ],
   },
   {
@@ -168,6 +229,41 @@ export const NAVIGATION: readonly NavGroup[] = [
       { labelKey: "nav.administration.roles", path: "/roles", phase: 0, available: true },
       { labelKey: "nav.administration.audit", path: "/audit", phase: 0, available: true },
       { labelKey: "nav.administration.settings", phase: 0, available: false },
+    ],
+  },
+  {
+    labelKey: "nav.billing",
+    items: [
+      // Prompt #16's SaaS billing surface: subscription, invoices, payments, usage,
+      // and billing account. Each reads real tables and writes through billing doors.
+      // This is the platform's own billing — what organizations pay AMRUT NIVAAS —
+      // not the hospitality finance module (which is a customer's business finance).
+      { labelKey: "nav.billing.subscription", path: "/billing/subscription", phase: 10, available: true },
+      { labelKey: "nav.billing.invoices", path: "/billing/invoices", phase: 10, available: true },
+      { labelKey: "nav.billing.payments", path: "/billing/payments", phase: 10, available: true },
+      { labelKey: "nav.billing.usage", path: "/billing/usage", phase: 10, available: true },
+      { labelKey: "nav.billing.account", path: "/billing/account", phase: 10, available: true },
+    ],
+  },
+  {
+    labelKey: "nav.notifications",
+    items: [
+      // Prompt #17's notification and automation layer: notification center,
+      // preferences, communication history, and automation rules. Reacts to
+      // domain events and produces notifications, emails, SMS, WhatsApp messages.
+      { labelKey: "nav.notifications.center", path: "/notifications", phase: 10, available: true },
+      { labelKey: "nav.notifications.preferences", path: "/notifications/preferences", phase: 10, available: true },
+      { labelKey: "nav.notifications.communications", path: "/notifications/communications", phase: 10, available: true },
+      { labelKey: "nav.notifications.automations", path: "/notifications/automations", phase: 10, available: true },
+    ],
+  },
+  {
+    labelKey: "nav.integrations",
+    items: [
+      // Prompt #20's integration and API platform layer: manage external system
+      // connections (payment, messaging, booking, accounting, etc.), webhooks,
+      // and API keys. Provider adapters abstract vendor-specific complexity.
+      { labelKey: "nav.integrations.settings", path: "/integrations", phase: 10, available: true },
     ],
   },
 ];

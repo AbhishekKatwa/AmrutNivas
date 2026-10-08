@@ -71,6 +71,12 @@ export type Guest = {
   version: number;
   createdAt: string;
   updatedAt: string;
+  // CRM fields (migration 041)
+  customerType: string | null;
+  companyName: string | null;
+  designation: string | null;
+  anniversaryDate: string | null;
+  corporateAccountId: string | null;
 };
 
 export type GuestDocument = {
@@ -500,5 +506,398 @@ export type FolioEntry = {
   voidedBy: string | null;
   notes: string | null;
   createdAt: string;
+  createdBy: string | null;
+};
+
+// =================================================================== housekeeping tasks
+
+export type HousekeepingTaskType =
+  | "CHECKOUT_CLEAN"
+  | "STAYOVER_CLEAN"
+  | "DEEP_CLEAN"
+  | "INSPECTION"
+  | "TURNDOWN"
+  | "SPECIAL_REQUEST"
+  | "OTHER";
+
+export const HOUSEKEEPING_TASK_TYPES: readonly HousekeepingTaskType[] = [
+  "CHECKOUT_CLEAN",
+  "STAYOVER_CLEAN",
+  "DEEP_CLEAN",
+  "INSPECTION",
+  "TURNDOWN",
+  "SPECIAL_REQUEST",
+  "OTHER",
+];
+
+export type HousekeepingPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+export const HOUSEKEEPING_PRIORITIES: readonly HousekeepingPriority[] = [
+  "LOW",
+  "NORMAL",
+  "HIGH",
+  "URGENT",
+];
+
+export type HousekeepingTaskStatus =
+  | "PENDING"
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "VERIFIED"
+  | "CANCELLED";
+
+export const HOUSEKEEPING_TASK_STATUSES: readonly HousekeepingTaskStatus[] = [
+  "PENDING",
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "VERIFIED",
+  "CANCELLED",
+];
+
+export type HousekeepingTask = {
+  id: string;
+  organizationId: string;
+  propertyId: string;
+  roomId: string;
+  stayId: string | null;
+  taskType: HousekeepingTaskType;
+  priority: HousekeepingPriority;
+  status: HousekeepingTaskStatus;
+  assignedTo: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+  notes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+};
+
+// =================================================================== inspection checklists
+
+export type InspectionChecklist = {
+  id: string;
+  organizationId: string;
+  propertyId: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+};
+
+export type ChecklistCategory =
+  | "BEDDING"
+  | "BATHROOM"
+  | "AMENITIES"
+  | "ELECTRICAL"
+  | "HVAC"
+  | "CLEANLINESS"
+  | "SAFETY"
+  | "GENERAL";
+
+export const CHECKLIST_CATEGORIES: readonly ChecklistCategory[] = [
+  "BEDDING",
+  "BATHROOM",
+  "AMENITIES",
+  "ELECTRICAL",
+  "HVAC",
+  "CLEANLINESS",
+  "SAFETY",
+  "GENERAL",
+];
+
+export type InspectionChecklistItem = {
+  id: string;
+  checklistId: string;
+  question: string;
+  category: ChecklistCategory;
+  sortOrder: number;
+  isRequired: boolean;
+  createdAt: string;
+};
+
+// =================================================================== room inspections
+
+export type InspectionStatus = "PENDING" | "PASSED" | "FAILED";
+
+export const INSPECTION_STATUSES: readonly InspectionStatus[] = [
+  "PENDING",
+  "PASSED",
+  "FAILED",
+];
+
+export type RoomInspection = {
+  id: string;
+  organizationId: string;
+  propertyId: string;
+  roomId: string;
+  housekeepingTaskId: string | null;
+  checklistId: string | null;
+  inspectorId: string | null;
+  status: InspectionStatus;
+  inspectionDate: string;
+  passedAt: string | null;
+  failedAt: string | null;
+  notes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+};
+
+export type InspectionResult = "PASS" | "FAIL" | "NOT_APPLICABLE";
+
+export const INSPECTION_RESULTS: readonly InspectionResult[] = [
+  "PASS",
+  "FAIL",
+  "NOT_APPLICABLE",
+];
+
+export type RoomInspectionResult = {
+  id: string;
+  inspectionId: string;
+  checklistItemId: string;
+  result: InspectionResult;
+  note: string | null;
+  createdAt: string;
+};
+
+// =================================================================== maintenance requests
+
+export type MaintenanceCategory =
+  | "ELECTRICAL"
+  | "PLUMBING"
+  | "HVAC"
+  | "CARPENTRY"
+  | "PAINTING"
+  | "APPLIANCE"
+  | "IT"
+  | "CIVIL"
+  | "FURNITURE"
+  | "ROOM_AMENITY"
+  | "KITCHEN_EQUIPMENT"
+  | "OTHER";
+
+export const MAINTENANCE_CATEGORIES: readonly MaintenanceCategory[] = [
+  "ELECTRICAL",
+  "PLUMBING",
+  "HVAC",
+  "CARPENTRY",
+  "PAINTING",
+  "APPLIANCE",
+  "IT",
+  "CIVIL",
+  "FURNITURE",
+  "ROOM_AMENITY",
+  "KITCHEN_EQUIPMENT",
+  "OTHER",
+];
+
+export type MaintenancePriority = "LOW" | "NORMAL" | "HIGH" | "URGENT" | "EMERGENCY";
+
+export const MAINTENANCE_PRIORITIES: readonly MaintenancePriority[] = [
+  "LOW",
+  "NORMAL",
+  "HIGH",
+  "URGENT",
+  "EMERGENCY",
+];
+
+export type MaintenanceStatus =
+  | "OPEN"
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "ON_HOLD"
+  | "RESOLVED"
+  | "VERIFIED"
+  | "CLOSED"
+  | "CANCELLED";
+
+export const MAINTENANCE_STATUSES: readonly MaintenanceStatus[] = [
+  "OPEN",
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "ON_HOLD",
+  "RESOLVED",
+  "VERIFIED",
+  "CLOSED",
+  "CANCELLED",
+];
+
+export type MaintenanceSource =
+  | "HOUSEKEEPING"
+  | "FRONT_DESK"
+  | "MANAGER"
+  | "INSPECTION"
+  | "SYSTEM"
+  | "EMPLOYEE"
+  | "GUEST"
+  | "OTHER";
+
+export const MAINTENANCE_SOURCES: readonly MaintenanceSource[] = [
+  "HOUSEKEEPING",
+  "FRONT_DESK",
+  "MANAGER",
+  "INSPECTION",
+  "SYSTEM",
+  "EMPLOYEE",
+  "GUEST",
+  "OTHER",
+];
+
+export type MaintenanceRequest = {
+  id: string;
+  organizationId: string;
+  propertyId: string;
+  roomId: string | null;
+  outletId: string | null;
+  assetId: string | null;
+  category: MaintenanceCategory;
+  priority: MaintenancePriority;
+  status: MaintenanceStatus;
+  source: MaintenanceSource;
+  title: string;
+  description: string | null;
+  reportedBy: string | null;
+  assignedTo: string | null;
+  assignedVendorId: string | null;
+  estimatedCost: number | null;
+  actualCost: number | null;
+  reportedAt: string;
+  assignedAt: string | null;
+  startedAt: string | null;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+  verificationNotes: string | null;
+  closedAt: string | null;
+  closedBy: string | null;
+  resolution: string | null;
+  notes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+};
+
+// =================================================================== lost & found
+
+export type LostFoundCategory =
+  | "ELECTRONICS"
+  | "JEWELRY"
+  | "CLOTHING"
+  | "DOCUMENTS"
+  | "KEYS"
+  | "MEDICATION"
+  | "OTHER";
+
+export const LOST_FOUND_CATEGORIES: readonly LostFoundCategory[] = [
+  "ELECTRONICS",
+  "JEWELRY",
+  "CLOTHING",
+  "DOCUMENTS",
+  "KEYS",
+  "MEDICATION",
+  "OTHER",
+];
+
+export type LostFoundStatus = "FOUND" | "STORED" | "CLAIMED" | "RETURNED" | "DISPOSED";
+
+export const LOST_FOUND_STATUSES: readonly LostFoundStatus[] = [
+  "FOUND",
+  "STORED",
+  "CLAIMED",
+  "RETURNED",
+  "DISPOSED",
+];
+
+export type LostFoundItem = {
+  id: string;
+  organizationId: string;
+  propertyId: string;
+  roomId: string | null;
+  foundBy: string | null;
+  foundAt: string;
+  description: string;
+  category: LostFoundCategory;
+  status: LostFoundStatus;
+  storageLocation: string | null;
+  guestId: string | null;
+  returnedAt: string | null;
+  returnedTo: string | null;
+  notes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+};
+
+// =================================================================== assets
+
+export type AssetCategory =
+  | "AC"
+  | "TV"
+  | "REFRIGERATOR"
+  | "WASHING_MACHINE"
+  | "ELEVATOR"
+  | "BOILER"
+  | "GENERATOR"
+  | "KITCHEN_EQUIPMENT"
+  | "FURNITURE"
+  | "IT_EQUIPMENT"
+  | "OTHER";
+
+export const ASSET_CATEGORIES: readonly AssetCategory[] = [
+  "AC",
+  "TV",
+  "REFRIGERATOR",
+  "WASHING_MACHINE",
+  "ELEVATOR",
+  "BOILER",
+  "GENERATOR",
+  "KITCHEN_EQUIPMENT",
+  "FURNITURE",
+  "IT_EQUIPMENT",
+  "OTHER",
+];
+
+export type AssetStatus = "ACTIVE" | "MAINTENANCE" | "RETIRED" | "SOLD";
+
+export const ASSET_STATUSES: readonly AssetStatus[] = [
+  "ACTIVE",
+  "MAINTENANCE",
+  "RETIRED",
+  "SOLD",
+];
+
+export type Asset = {
+  id: string;
+  organizationId: string;
+  propertyId: string;
+  roomId: string | null;
+  outletId: string | null;
+  assetCode: string;
+  name: string;
+  category: AssetCategory;
+  locationDescription: string | null;
+  status: AssetStatus;
+  serialNumber: string | null;
+  manufacturer: string | null;
+  modelNumber: string | null;
+  purchaseDate: string | null;
+  purchaseCost: number | null;
+  warrantyEndDate: string | null;
+  notes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
   createdBy: string | null;
 };

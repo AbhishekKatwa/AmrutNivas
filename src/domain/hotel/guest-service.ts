@@ -23,7 +23,8 @@ const GUEST_DOCUMENTS = "guest_documents";
 const GUEST_COLUMNS =
   "id, organization_id, first_name, last_name, phone, email, date_of_birth, nationality, " +
   "gender, address, vip_status, source, total_stays, total_nights, notes, status, archived_at, " +
-  "version, created_at, updated_at";
+  "version, created_at, updated_at, customer_type, company_name, designation, anniversary_date, " +
+  "corporate_account_id";
 
 const GUEST_DOCUMENT_COLUMNS =
   "id, organization_id, guest_id, document_type, document_number, issuing_country, expiry_date, " +

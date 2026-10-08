@@ -1,18 +1,17 @@
 /**
  * The permission catalogue (Prompt #03 §11, §12, §58).
  *
- * One entry per capability the database can actually grant: 54 tokens — the 25
- * distinct permissions granted by the role matrix in `006_seed_rbac.sql` (which
- * self-checks `count(*) = 25`), the two custom-role tokens `role.create` and
- * `role.edit` added in `011_custom_roles.sql`, and the 27 restaurant capabilities
- * seeded by `013_restaurant_permissions.sql`. No other migration inserts into
- * `role_permissions`. `permissions.test.ts` used to re-read all three files and diff
- * them against this list in both directions, so a seed that gained or dropped a token
- * failed the build instead of shipping a button the doors refuse, or a doc naming
- * a capability nobody can grant. The suite is deleted (2026-10-07, owner instruction),
- * so this list is hand-mirrored from those three seeds and the drift answers at the
- * door. `018`'s permission-drift self-check (its gate over every `require_permission`
- * literal against `role_permissions`) is the only mechanical proof that remains.
+ * One entry per capability the database can actually grant: 155 tokens — the 25
+ * distinct permissions granted by the role matrix in `006_seed_rbac.sql`, the two
+ * custom-role tokens `role.create` and `role.edit` from `011_custom_roles.sql`,
+ * the 27 restaurant capabilities from `013_restaurant_permissions.sql`, the 46
+ * hotel PMS tokens from `032_hotel_permissions.sql`, the 28 housekeeping,
+ * maintenance and room operations tokens from `040_housekeeping_maintenance_permissions.sql`,
+ * and the 27 CRM tokens from `041_crm_foundation.sql`.
+ * No other migration inserts into `role_permissions`. The suite that used to diff
+ * this list against the seeds is deleted (2026-10-07, owner instruction), so this
+ * list is hand-mirrored and the drift answers at the door. `018`'s permission-drift
+ * self-check is the only mechanical proof that remains.
  *
  * This is a label-and-lookup layer, not a second permission system: 006's header
  * records the donor project's "role matrix lives twice" failure, so the answer to
@@ -56,7 +55,53 @@ export type PermissionDomain =
   | "user"
   | "role"
   | "audit"
-  | "platform";
+  | "platform"
+  | "hotel"
+  | "room_type"
+  | "room"
+  | "reservation"
+  | "frontoffice"
+  | "stay"
+  | "folio"
+  | "hotel_payment"
+  | "guest"
+  | "room_availability"
+  | "housekeeping_status"
+  | "housekeeping"
+  | "maintenance"
+  | "lost_found"
+  | "asset"
+  | "room_operation"
+  | "crm"
+  | "customer"
+  | "customer_note"
+  | "customer_preference"
+  | "customer_tag"
+  | "feedback"
+  | "complaint"
+  | "loyalty"
+  | "segment"
+  | "corporate"
+  | "events"
+  | "event_lead"
+  | "event_venue"
+  | "event_quotation"
+  | "event_payment"
+  | "event_plan"
+  | "event_task"
+  | "event_vendor"
+  | "event_schedule"
+  | "event_pnl"
+  | "event_document"
+  | "hr"
+  | "commerce"
+  | "enterprise"
+  | "billing"
+  | "notifications"
+  | "communications"
+  | "automation"
+  | "analytics"
+  | "integrations";
 
 export type PermissionEntry = {
   /** The exact `domain.verb` string a `role_permissions` row stores. */
@@ -423,12 +468,213 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
   },
 
   // -------------------------------------------------------------------- platform
+  // Prompt #22's platform admin layer (048): platform roles, permissions, support
+  // cases, security incidents, announcements, feature flags, data export/deletion.
+  // Platform permissions are separate from organization permissions — a platform
+  // admin operates the SaaS platform, not a customer's business data.
   {
-    key: "platform.manage",
+    key: "platform.dashboard.view",
     domain: "platform",
-    verb: "manage",
-    description:
-      "Operate the AMRUT NIVAAS platform itself, including administration of any tenant.",
+    verb: "dashboard.view",
+    description: "See the platform admin dashboard with operational metrics.",
+  },
+  {
+    key: "platform.organization.view",
+    domain: "platform",
+    verb: "organization.view",
+    description: "See all organizations on the platform.",
+  },
+  {
+    key: "platform.organization.manage",
+    domain: "platform",
+    verb: "organization.manage",
+    description: "Manage organization details and settings.",
+  },
+  {
+    key: "platform.organization.suspend",
+    domain: "platform",
+    verb: "organization.suspend",
+    description: "Suspend an organization's access to the platform.",
+  },
+  {
+    key: "platform.organization.archive",
+    domain: "platform",
+    verb: "organization.archive",
+    description: "Archive an organization.",
+  },
+  {
+    key: "platform.user.view",
+    domain: "platform",
+    verb: "user.view",
+    description: "See users across all organizations.",
+  },
+  {
+    key: "platform.user.manage",
+    domain: "platform",
+    verb: "user.manage",
+    description: "Manage platform users and their platform roles.",
+  },
+  {
+    key: "platform.subscription.view",
+    domain: "platform",
+    verb: "subscription.view",
+    description: "See subscriptions across all organizations.",
+  },
+  {
+    key: "platform.subscription.manage",
+    domain: "platform",
+    verb: "subscription.manage",
+    description: "Manage organization subscriptions.",
+  },
+  {
+    key: "platform.plan.view",
+    domain: "platform",
+    verb: "plan.view",
+    description: "See the subscription plans the platform offers.",
+  },
+  {
+    key: "platform.plan.manage",
+    domain: "platform",
+    verb: "plan.manage",
+    description: "Create, edit and archive subscription plans.",
+  },
+  {
+    key: "platform.billing.view",
+    domain: "platform",
+    verb: "billing.view",
+    description: "See platform billing and revenue metrics.",
+  },
+  {
+    key: "platform.billing.manage",
+    domain: "platform",
+    verb: "billing.manage",
+    description: "Manage platform billing settings.",
+  },
+  {
+    key: "platform.support.view",
+    domain: "platform",
+    verb: "support.view",
+    description: "See support cases across all organizations.",
+  },
+  {
+    key: "platform.support.manage",
+    domain: "platform",
+    verb: "support.manage",
+    description: "Manage support cases and assign them to staff.",
+  },
+  {
+    key: "platform.support.impersonate",
+    domain: "platform",
+    verb: "support.impersonate",
+    description: "Access an organization in support mode with time-limited, scoped access.",
+  },
+  {
+    key: "platform.health.view",
+    domain: "platform",
+    verb: "health.view",
+    description: "See system health and operational status.",
+  },
+  {
+    key: "platform.integration.view",
+    domain: "platform",
+    verb: "integration.view",
+    description: "See integration health across all organizations.",
+  },
+  {
+    key: "platform.integration.manage",
+    domain: "platform",
+    verb: "integration.manage",
+    description: "Manage platform-level integration settings.",
+  },
+  {
+    key: "platform.webhook.view",
+    domain: "platform",
+    verb: "webhook.view",
+    description: "See webhook delivery status across all organizations.",
+  },
+  {
+    key: "platform.security.view",
+    domain: "platform",
+    verb: "security.view",
+    description: "See security events and incidents.",
+  },
+  {
+    key: "platform.security.manage",
+    domain: "platform",
+    verb: "security.manage",
+    description: "Manage security incidents and responses.",
+  },
+  {
+    key: "platform.incident.view",
+    domain: "platform",
+    verb: "incident.view",
+    description: "See security incidents.",
+  },
+  {
+    key: "platform.incident.manage",
+    domain: "platform",
+    verb: "incident.manage",
+    description: "Create, update and resolve security incidents.",
+  },
+  {
+    key: "platform.audit.view",
+    domain: "platform",
+    verb: "audit.view",
+    description: "See platform audit logs.",
+  },
+  {
+    key: "platform.audit.export",
+    domain: "platform",
+    verb: "audit.export",
+    description: "Export platform audit logs.",
+  },
+  {
+    key: "platform.announcement.view",
+    domain: "platform",
+    verb: "announcement.view",
+    description: "See platform announcements.",
+  },
+  {
+    key: "platform.announcement.manage",
+    domain: "platform",
+    verb: "announcement.manage",
+    description: "Create and manage platform-wide announcements.",
+  },
+  {
+    key: "platform.configuration.view",
+    domain: "platform",
+    verb: "configuration.view",
+    description: "See platform configuration settings.",
+  },
+  {
+    key: "platform.configuration.manage",
+    domain: "platform",
+    verb: "configuration.manage",
+    description: "Manage platform configuration settings.",
+  },
+  {
+    key: "platform.feature_flag.view",
+    domain: "platform",
+    verb: "feature_flag.view",
+    description: "See feature flags and their status.",
+  },
+  {
+    key: "platform.feature_flag.manage",
+    domain: "platform",
+    verb: "feature_flag.manage",
+    description: "Create, enable and disable feature flags.",
+  },
+  {
+    key: "platform.analytics.view",
+    domain: "platform",
+    verb: "analytics.view",
+    description: "See platform-wide analytics and metrics.",
+  },
+  {
+    key: "platform.analytics.export",
+    domain: "platform",
+    verb: "analytics.export",
+    description: "Export platform analytics.",
   },
 
   // ------------------------------------------------------------------- inventory
@@ -811,6 +1057,1522 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
     domain: "purchase_return",
     verb: "post",
     description: "Post a purchase return, reversing the stock and payable.",
+  },
+
+  // ------------------------------------------------------------------------ hotel
+  // Prompt #08's hotel PMS domain (032): room types, rooms, reservations, front office,
+  // stays, folios, payments, guests, availability, housekeeping status foundation.
+  {
+    key: "hotel.view",
+    domain: "hotel",
+    verb: "view",
+    description: "Open the hotel PMS module for the properties you can reach.",
+  },
+  {
+    key: "room_type.view",
+    domain: "room_type",
+    verb: "view",
+    description: "See the room types and their configurations.",
+  },
+  {
+    key: "room_type.create",
+    domain: "room_type",
+    verb: "create",
+    description: "Add a new room type to the property.",
+  },
+  {
+    key: "room_type.edit",
+    domain: "room_type",
+    verb: "edit",
+    description: "Change a room type's details, occupancy or configuration.",
+  },
+  {
+    key: "room_type.archive",
+    domain: "room_type",
+    verb: "archive",
+    description: "Retire a room type so no new rooms use it.",
+  },
+  {
+    key: "room.view",
+    domain: "room",
+    verb: "view",
+    description: "See the rooms, their types and current status.",
+  },
+  {
+    key: "room.create",
+    domain: "room",
+    verb: "create",
+    description: "Add a new room to the property.",
+  },
+  {
+    key: "room.edit",
+    domain: "room",
+    verb: "edit",
+    description: "Change a room's type, number, floor or notes.",
+  },
+  {
+    key: "room.archive",
+    domain: "room",
+    verb: "archive",
+    description: "Retire a room so it no longer appears in the inventory.",
+  },
+  {
+    key: "room.block",
+    domain: "room",
+    verb: "block",
+    description: "Block a room for a date range, preventing reservations.",
+  },
+  {
+    key: "reservation.view",
+    domain: "reservation",
+    verb: "view",
+    description: "See reservations and their status.",
+  },
+  {
+    key: "reservation.create",
+    domain: "reservation",
+    verb: "create",
+    description: "Create a new reservation for a guest.",
+  },
+  {
+    key: "reservation.edit",
+    domain: "reservation",
+    verb: "edit",
+    description: "Change a reservation's dates, room type or guest details.",
+  },
+  {
+    key: "reservation.confirm",
+    domain: "reservation",
+    verb: "confirm",
+    description: "Confirm a pending reservation.",
+  },
+  {
+    key: "reservation.cancel",
+    domain: "reservation",
+    verb: "cancel",
+    description: "Cancel a reservation with a recorded reason.",
+  },
+  {
+    key: "reservation.no_show",
+    domain: "reservation",
+    verb: "no_show",
+    description: "Mark a reservation as a no-show.",
+  },
+  {
+    key: "reservation.modify_rate",
+    domain: "reservation",
+    verb: "modify_rate",
+    description: "Override the rate on a reservation.",
+  },
+  {
+    key: "reservation.assign_room",
+    domain: "reservation",
+    verb: "assign_room",
+    description: "Assign a specific room to a reservation.",
+  },
+  {
+    key: "frontoffice.view",
+    domain: "frontoffice",
+    verb: "view",
+    description: "See the front office dashboard and today's arrivals/departures.",
+  },
+  {
+    key: "frontoffice.checkin",
+    domain: "frontoffice",
+    verb: "checkin",
+    description: "Check a guest into their room.",
+  },
+  {
+    key: "frontoffice.checkout",
+    domain: "frontoffice",
+    verb: "checkout",
+    description: "Check a guest out of their room.",
+  },
+  {
+    key: "frontoffice.room_move",
+    domain: "frontoffice",
+    verb: "room_move",
+    description: "Move a guest to a different room during their stay.",
+  },
+  {
+    key: "stay.view",
+    domain: "stay",
+    verb: "view",
+    description: "See active and past guest stays.",
+  },
+  {
+    key: "stay.create",
+    domain: "stay",
+    verb: "create",
+    description: "Create a stay record for a walk-in guest.",
+  },
+  {
+    key: "stay.modify",
+    domain: "stay",
+    verb: "modify",
+    description: "Modify an active stay's dates or room.",
+  },
+  {
+    key: "folio.view",
+    domain: "folio",
+    verb: "view",
+    description: "See a guest's folio with charges and payments.",
+  },
+  {
+    key: "folio.charge",
+    domain: "folio",
+    verb: "charge",
+    description: "Post a charge to a guest's folio.",
+  },
+  {
+    key: "folio.adjust",
+    domain: "folio",
+    verb: "adjust",
+    description: "Adjust a charge on a folio with a recorded reason.",
+  },
+  {
+    key: "folio.discount",
+    domain: "folio",
+    verb: "discount",
+    description: "Apply a discount to a folio charge.",
+  },
+  {
+    key: "folio.settle",
+    domain: "folio",
+    verb: "settle",
+    description: "Settle a folio by recording payment.",
+  },
+  {
+    key: "hotel_payment.view",
+    domain: "hotel_payment",
+    verb: "view",
+    description: "See payments recorded against folios.",
+  },
+  {
+    key: "hotel_payment.create",
+    domain: "hotel_payment",
+    verb: "create",
+    description: "Record a payment against a folio.",
+  },
+  {
+    key: "hotel_payment.refund",
+    domain: "hotel_payment",
+    verb: "refund",
+    description: "Refund a hotel payment with a recorded reason.",
+  },
+  {
+    key: "guest.view",
+    domain: "guest",
+    verb: "view",
+    description: "See guest profiles and contact details.",
+  },
+  {
+    key: "guest.create",
+    domain: "guest",
+    verb: "create",
+    description: "Add a new guest profile.",
+  },
+  {
+    key: "guest.edit",
+    domain: "guest",
+    verb: "edit",
+    description: "Change a guest's profile details.",
+  },
+  {
+    key: "guest.sensitive.view",
+    domain: "guest",
+    verb: "sensitive.view",
+    description: "See sensitive guest information such as ID documents.",
+  },
+  {
+    key: "room_availability.view",
+    domain: "room_availability",
+    verb: "view",
+    description: "See room availability for dates.",
+  },
+  {
+    key: "room_availability.override",
+    domain: "room_availability",
+    verb: "override",
+    description: "Override room availability for a date range.",
+  },
+  {
+    key: "housekeeping_status.view",
+    domain: "housekeeping_status",
+    verb: "view",
+    description: "See the housekeeping status of rooms.",
+  },
+  {
+    key: "housekeeping_status.update",
+    domain: "housekeeping_status",
+    verb: "update",
+    description: "Update a room's housekeeping status.",
+  },
+
+  // --------------------------------------------------------------- housekeeping
+  // Prompt #09's housekeeping domain (039): tasks, inspections, checklists.
+  {
+    key: "housekeeping.view",
+    domain: "housekeeping",
+    verb: "view",
+    description: "Open the housekeeping module and see tasks.",
+  },
+  {
+    key: "housekeeping.task.create",
+    domain: "housekeeping",
+    verb: "task.create",
+    description: "Create a new housekeeping task for a room.",
+  },
+  {
+    key: "housekeeping.task.assign",
+    domain: "housekeeping",
+    verb: "task.assign",
+    description: "Assign a housekeeping task to a staff member.",
+  },
+  {
+    key: "housekeeping.task.start",
+    domain: "housekeeping",
+    verb: "task.start",
+    description: "Start working on an assigned housekeeping task.",
+  },
+  {
+    key: "housekeeping.task.complete",
+    domain: "housekeeping",
+    verb: "task.complete",
+    description: "Mark a housekeeping task as completed.",
+  },
+  {
+    key: "housekeeping.task.verify",
+    domain: "housekeeping",
+    verb: "task.verify",
+    description: "Verify a completed housekeeping task.",
+  },
+  {
+    key: "housekeeping.task.cancel",
+    domain: "housekeeping",
+    verb: "task.cancel",
+    description: "Cancel a housekeeping task with a recorded reason.",
+  },
+  {
+    key: "housekeeping.inspection.create",
+    domain: "housekeeping",
+    verb: "inspection.create",
+    description: "Create a room inspection record.",
+  },
+  {
+    key: "housekeeping.inspection.complete",
+    domain: "housekeeping",
+    verb: "inspection.complete",
+    description: "Complete a room inspection with pass/fail results.",
+  },
+
+  // --------------------------------------------------------------- maintenance
+  // Prompt #09's maintenance domain (039): requests, assignments, resolutions.
+  {
+    key: "maintenance.view",
+    domain: "maintenance",
+    verb: "view",
+    description: "Open the maintenance module and see requests.",
+  },
+  {
+    key: "maintenance.create",
+    domain: "maintenance",
+    verb: "create",
+    description: "Create a new maintenance request.",
+  },
+  {
+    key: "maintenance.assign",
+    domain: "maintenance",
+    verb: "assign",
+    description: "Assign a maintenance request to a technician.",
+  },
+  {
+    key: "maintenance.start",
+    domain: "maintenance",
+    verb: "start",
+    description: "Start working on an assigned maintenance request.",
+  },
+  {
+    key: "maintenance.resolve",
+    domain: "maintenance",
+    verb: "resolve",
+    description: "Mark a maintenance request as resolved.",
+  },
+  {
+    key: "maintenance.verify",
+    domain: "maintenance",
+    verb: "verify",
+    description: "Verify a resolved maintenance request.",
+  },
+  {
+    key: "maintenance.close",
+    domain: "maintenance",
+    verb: "close",
+    description: "Close a verified maintenance request.",
+  },
+  {
+    key: "maintenance.cancel",
+    domain: "maintenance",
+    verb: "cancel",
+    description: "Cancel a maintenance request with a recorded reason.",
+  },
+  {
+    key: "maintenance.cost.view",
+    domain: "maintenance",
+    verb: "cost.view",
+    description: "See maintenance costs and parts consumption.",
+  },
+  {
+    key: "maintenance.parts.consume",
+    domain: "maintenance",
+    verb: "parts.consume",
+    description: "Record parts consumption against a maintenance request.",
+  },
+
+  // --------------------------------------------------------------- room operations
+  // Prompt #09's room operations (039): operational status management.
+  {
+    key: "room_operation.view",
+    domain: "room_operation",
+    verb: "view",
+    description: "See the room operations board with status management.",
+  },
+  {
+    key: "room_operation.manage",
+    domain: "room_operation",
+    verb: "manage",
+    description: "Manage room operational status and blocks.",
+  },
+  {
+    key: "room.release",
+    domain: "room",
+    verb: "release",
+    description: "Release a room block.",
+  },
+
+  // --------------------------------------------------------------- lost & found
+  // Prompt #09's lost & found foundation (039).
+  {
+    key: "lost_found.view",
+    domain: "lost_found",
+    verb: "view",
+    description: "See lost and found items.",
+  },
+  {
+    key: "lost_found.create",
+    domain: "lost_found",
+    verb: "create",
+    description: "Log a new lost or found item.",
+  },
+  {
+    key: "lost_found.return",
+    domain: "lost_found",
+    verb: "return",
+    description: "Return a found item to its owner.",
+  },
+
+  // ------------------------------------------------------------------------ asset
+  // Prompt #09's asset foundation (039).
+  {
+    key: "asset.view",
+    domain: "asset",
+    verb: "view",
+    description: "See assets and their maintenance history.",
+  },
+  {
+    key: "asset.create",
+    domain: "asset",
+    verb: "create",
+    description: "Add a new asset to the property.",
+  },
+  {
+    key: "asset.edit",
+    domain: "asset",
+    verb: "edit",
+    description: "Change an asset's details or location.",
+  },
+
+  // -------------------------------------------------------------------------- crm
+  // Prompt #11's CRM foundation (041). Extends guests into customer identity,
+  // adds preferences, tags, notes, feedback, complaints, loyalty, corporate
+  // accounts, relationships, and segmentation.
+  {
+    key: "crm.view",
+    domain: "crm",
+    verb: "view",
+    description: "Open the CRM module.",
+  },
+  {
+    key: "crm.customer.view",
+    domain: "customer",
+    verb: "view",
+    description: "See customer profiles and their activity history.",
+  },
+  {
+    key: "crm.customer.create",
+    domain: "customer",
+    verb: "create",
+    description: "Add a new customer to the organization.",
+  },
+  {
+    key: "crm.customer.edit",
+    domain: "customer",
+    verb: "edit",
+    description: "Change a customer's details, preferences and CRM fields.",
+  },
+  {
+    key: "crm.customer.archive",
+    domain: "customer",
+    verb: "archive",
+    description: "Retire a customer profile so it stops appearing in active lists.",
+  },
+  {
+    key: "crm.customer.merge",
+    domain: "customer",
+    verb: "merge",
+    description: "Merge duplicate customer profiles into one canonical identity.",
+  },
+  {
+    key: "crm.customer.note.view",
+    domain: "customer_note",
+    verb: "view",
+    description: "See notes attached to a customer profile.",
+  },
+  {
+    key: "crm.customer.note.create",
+    domain: "customer_note",
+    verb: "create",
+    description: "Add a new note to a customer profile.",
+  },
+  {
+    key: "crm.customer.note.edit",
+    domain: "customer_note",
+    verb: "edit",
+    description: "Change the text of a customer note.",
+  },
+  {
+    key: "crm.customer.note.delete",
+    domain: "customer_note",
+    verb: "delete",
+    description: "Remove a note from a customer profile.",
+  },
+  {
+    key: "crm.customer.preference.view",
+    domain: "customer_preference",
+    verb: "view",
+    description: "See a customer's communication and structured preferences.",
+  },
+  {
+    key: "crm.customer.preference.manage",
+    domain: "customer_preference",
+    verb: "manage",
+    description: "Change a customer's communication consent and preference entries.",
+  },
+  {
+    key: "crm.customer.tag.view",
+    domain: "customer_tag",
+    verb: "view",
+    description: "See customer tags and their assignments.",
+  },
+  {
+    key: "crm.customer.tag.manage",
+    domain: "customer_tag",
+    verb: "manage",
+    description: "Create, edit and assign tags to customers.",
+  },
+  {
+    key: "crm.feedback.view",
+    domain: "feedback",
+    verb: "view",
+    description: "See customer feedback entries and their ratings.",
+  },
+  {
+    key: "crm.feedback.create",
+    domain: "feedback",
+    verb: "create",
+    description: "Record new customer feedback.",
+  },
+  {
+    key: "crm.feedback.manage",
+    domain: "feedback",
+    verb: "manage",
+    description: "Update feedback status and resolution.",
+  },
+  {
+    key: "crm.complaint.view",
+    domain: "complaint",
+    verb: "view",
+    description: "See complaints and their resolution status.",
+  },
+  {
+    key: "crm.complaint.create",
+    domain: "complaint",
+    verb: "create",
+    description: "Log a new customer complaint.",
+  },
+  {
+    key: "crm.complaint.manage",
+    domain: "complaint",
+    verb: "manage",
+    description: "Assign, resolve and close complaints.",
+  },
+  {
+    key: "crm.loyalty.view",
+    domain: "loyalty",
+    verb: "view",
+    description: "See loyalty programs, accounts and transaction history.",
+  },
+  {
+    key: "crm.loyalty.manage",
+    domain: "loyalty",
+    verb: "manage",
+    description: "Create loyalty programs, enrol customers and manage tiers.",
+  },
+  {
+    key: "crm.loyalty.adjust",
+    domain: "loyalty",
+    verb: "adjust",
+    description: "Post manual loyalty point adjustments.",
+  },
+  {
+    key: "crm.segment.view",
+    domain: "segment",
+    verb: "view",
+    description: "See customer segments derived from activity data.",
+  },
+  {
+    key: "crm.segment.manage",
+    domain: "segment",
+    verb: "manage",
+    description: "Create and edit customer segmentation rules.",
+  },
+  {
+    key: "crm.corporate.view",
+    domain: "corporate",
+    verb: "view",
+    description: "See corporate accounts and their linked customers.",
+  },
+  {
+    key: "crm.corporate.manage",
+    domain: "corporate",
+    verb: "manage",
+    description: "Create and edit corporate accounts.",
+  },
+  // events & banquet (042) — 36 tokens covering the full event lifecycle
+  {
+    key: "events.view",
+    domain: "events",
+    verb: "view",
+    description: "See the events overview and dashboard.",
+  },
+  {
+    key: "events.lead.view",
+    domain: "event_lead",
+    verb: "view",
+    description: "See event leads and enquiries.",
+  },
+  {
+    key: "events.lead.create",
+    domain: "event_lead",
+    verb: "create",
+    description: "Create new event leads.",
+  },
+  {
+    key: "events.lead.edit",
+    domain: "event_lead",
+    verb: "edit",
+    description: "Edit event lead details.",
+  },
+  {
+    key: "events.lead.convert",
+    domain: "event_lead",
+    verb: "convert",
+    description: "Convert a lead into an event.",
+  },
+  {
+    key: "events.lead.assign",
+    domain: "event_lead",
+    verb: "assign",
+    description: "Assign leads to sales team members.",
+  },
+  {
+    key: "events.lead.close",
+    domain: "event_lead",
+    verb: "close",
+    description: "Close a lead as lost or cancelled.",
+  },
+  {
+    key: "events.event.view",
+    domain: "events",
+    verb: "event.view",
+    description: "See event details.",
+  },
+  {
+    key: "events.event.create",
+    domain: "events",
+    verb: "event.create",
+    description: "Create new events.",
+  },
+  {
+    key: "events.event.edit",
+    domain: "events",
+    verb: "event.edit",
+    description: "Edit event details.",
+  },
+  {
+    key: "events.event.confirm",
+    domain: "events",
+    verb: "event.confirm",
+    description: "Confirm an event booking.",
+  },
+  {
+    key: "events.event.cancel",
+    domain: "events",
+    verb: "event.cancel",
+    description: "Cancel an event.",
+  },
+  {
+    key: "events.event.complete",
+    domain: "events",
+    verb: "event.complete",
+    description: "Mark an event as completed.",
+  },
+  {
+    key: "events.venue.view",
+    domain: "event_venue",
+    verb: "view",
+    description: "See event venues and availability.",
+  },
+  {
+    key: "events.venue.manage",
+    domain: "event_venue",
+    verb: "manage",
+    description: "Create and edit event venues.",
+  },
+  {
+    key: "events.quotation.view",
+    domain: "event_quotation",
+    verb: "view",
+    description: "See event quotations.",
+  },
+  {
+    key: "events.quotation.create",
+    domain: "event_quotation",
+    verb: "create",
+    description: "Create event quotations.",
+  },
+  {
+    key: "events.quotation.edit",
+    domain: "event_quotation",
+    verb: "edit",
+    description: "Edit event quotation details and items.",
+  },
+  {
+    key: "events.quotation.send",
+    domain: "event_quotation",
+    verb: "send",
+    description: "Send a quotation to the customer.",
+  },
+  {
+    key: "events.quotation.accept",
+    domain: "event_quotation",
+    verb: "accept",
+    description: "Accept a quotation and confirm the event.",
+  },
+  {
+    key: "events.quotation.cancel",
+    domain: "event_quotation",
+    verb: "cancel",
+    description: "Cancel an event quotation.",
+  },
+  {
+    key: "events.payment.view",
+    domain: "event_payment",
+    verb: "view",
+    description: "See event payments and financials.",
+  },
+  {
+    key: "events.payment.create",
+    domain: "event_payment",
+    verb: "create",
+    description: "Record event payments (advance, partial, final).",
+  },
+  {
+    key: "events.payment.refund",
+    domain: "event_payment",
+    verb: "refund",
+    description: "Record event refunds.",
+  },
+  {
+    key: "events.plan.view",
+    domain: "event_plan",
+    verb: "view",
+    description: "See event plans and resource allocations.",
+  },
+  {
+    key: "events.plan.manage",
+    domain: "event_plan",
+    verb: "manage",
+    description: "Create and edit event plans.",
+  },
+  {
+    key: "events.task.view",
+    domain: "event_task",
+    verb: "view",
+    description: "See event tasks.",
+  },
+  {
+    key: "events.task.create",
+    domain: "event_task",
+    verb: "create",
+    description: "Create event tasks.",
+  },
+  {
+    key: "events.task.manage",
+    domain: "event_task",
+    verb: "manage",
+    description: "Edit and complete event tasks.",
+  },
+  {
+    key: "events.vendor.view",
+    domain: "event_vendor",
+    verb: "view",
+    description: "See event vendors and their services.",
+  },
+  {
+    key: "events.vendor.manage",
+    domain: "event_vendor",
+    verb: "manage",
+    description: "Add and edit event vendors.",
+  },
+  {
+    key: "events.schedule.view",
+    domain: "event_schedule",
+    verb: "view",
+    description: "See event day run sheets.",
+  },
+  {
+    key: "events.schedule.manage",
+    domain: "event_schedule",
+    verb: "manage",
+    description: "Create and edit schedule items.",
+  },
+  {
+    key: "events.pnl.view",
+    domain: "event_pnl",
+    verb: "view",
+    description: "See event profit and loss.",
+  },
+  {
+    key: "events.documents.view",
+    domain: "event_document",
+    verb: "view",
+    description: "See event documents.",
+  },
+  {
+    key: "events.documents.manage",
+    domain: "event_document",
+    verb: "manage",
+    description: "Upload and manage event documents.",
+  },
+  // -------------------------------------------------------------------------- hr
+  // Prompt #13's HR / workforce domain (043): employees, designations, attendance,
+  // shifts, roster, leave, holidays and documents. All writes through security-
+  // definer doors; reads under RLS.
+  {
+    key: "hr.view",
+    domain: "hr",
+    verb: "view",
+    description: "Open the HR module for the properties you can reach.",
+  },
+  {
+    key: "hr.employee.view",
+    domain: "hr",
+    verb: "view",
+    description: "See employee records, their details and employment status.",
+  },
+  {
+    key: "hr.employee.create",
+    domain: "hr",
+    verb: "create",
+    description: "Add a new employee to the organization.",
+  },
+  {
+    key: "hr.employee.edit",
+    domain: "hr",
+    verb: "edit",
+    description: "Change an employee's details, designation or assignment.",
+  },
+  {
+    key: "hr.employee.archive",
+    domain: "hr",
+    verb: "archive",
+    description: "Retire an employee record so they no longer appear as active.",
+  },
+  {
+    key: "hr.designation.view",
+    domain: "hr",
+    verb: "view",
+    description: "See the job titles and levels that exist in the organization.",
+  },
+  {
+    key: "hr.designation.manage",
+    domain: "hr",
+    verb: "manage",
+    description: "Create and change designations (job titles and levels).",
+  },
+  {
+    key: "hr.attendance.view",
+    domain: "hr",
+    verb: "view",
+    description: "See attendance records and daily presence for employees.",
+  },
+  {
+    key: "hr.attendance.mark",
+    domain: "hr",
+    verb: "mark",
+    description: "Record an employee's attendance for a day.",
+  },
+  {
+    key: "hr.attendance.correct",
+    domain: "hr",
+    verb: "correct",
+    description: "Correct a previously recorded attendance entry with a reason.",
+  },
+  {
+    key: "hr.shift.view",
+    domain: "hr",
+    verb: "view",
+    description: "See shift definitions and their timings.",
+  },
+  {
+    key: "hr.shift.manage",
+    domain: "hr",
+    verb: "manage",
+    description: "Create and change shift definitions (start, end, break).",
+  },
+  {
+    key: "hr.roster.view",
+    domain: "hr",
+    verb: "view",
+    description: "See the roster: which employee works which shift on which date.",
+  },
+  {
+    key: "hr.roster.manage",
+    domain: "hr",
+    verb: "manage",
+    description: "Assign employees to shifts and manage the roster.",
+  },
+  {
+    key: "hr.leave.view",
+    domain: "hr",
+    verb: "view",
+    description: "See leave requests and their approval status.",
+  },
+  {
+    key: "hr.leave.request",
+    domain: "hr",
+    verb: "request",
+    description: "Apply for leave on behalf of an employee.",
+  },
+  {
+    key: "hr.leave.approve",
+    domain: "hr",
+    verb: "approve",
+    description: "Approve a leave request so it is recorded as granted.",
+  },
+  {
+    key: "hr.leave.reject",
+    domain: "hr",
+    verb: "reject",
+    description: "Reject a leave request with a recorded reason.",
+  },
+  {
+    key: "hr.holiday.view",
+    domain: "hr",
+    verb: "view",
+    description: "See the holiday calendar for a property.",
+  },
+  {
+    key: "hr.holiday.manage",
+    domain: "hr",
+    verb: "manage",
+    description: "Create and manage holidays on the property calendar.",
+  },
+  {
+    key: "hr.document.view",
+    domain: "hr",
+    verb: "view",
+    description: "See employee document metadata and expiry dates.",
+  },
+  {
+    key: "hr.document.manage",
+    domain: "hr",
+    verb: "manage",
+    description: "Upload and remove employee document records.",
+  },
+  {
+    key: "hr.report.view",
+    domain: "hr",
+    verb: "view",
+    description: "See workforce reports: headcount, attendance summaries and leave balances.",
+  },
+  // ---------------------------------------------------------------------- commerce
+  // Prompt #14's commerce domain (044): digital channels, public profiles, QR codes,
+  // online ordering, direct booking, table requests, commerce settings.
+  {
+    key: "commerce.view",
+    domain: "commerce",
+    verb: "view",
+    description: "Open the commerce module and see digital channel overview.",
+  },
+  {
+    key: "commerce.channel.view",
+    domain: "commerce",
+    verb: "view",
+    description: "See commerce channels and their configuration.",
+  },
+  {
+    key: "commerce.channel.manage",
+    domain: "commerce",
+    verb: "manage",
+    description: "Create and edit commerce channels.",
+  },
+  {
+    key: "commerce.public_profile.view",
+    domain: "commerce",
+    verb: "view",
+    description: "See public property and outlet profiles.",
+  },
+  {
+    key: "commerce.public_profile.manage",
+    domain: "commerce",
+    verb: "manage",
+    description: "Create and edit public profiles for properties and outlets.",
+  },
+  {
+    key: "commerce.qr.view",
+    domain: "commerce",
+    verb: "view",
+    description: "See QR codes and their status.",
+  },
+  {
+    key: "commerce.qr.create",
+    domain: "commerce",
+    verb: "create",
+    description: "Generate new QR codes for menus, tables, properties.",
+  },
+  {
+    key: "commerce.qr.manage",
+    domain: "commerce",
+    verb: "manage",
+    description: "Activate, deactivate and regenerate QR codes.",
+  },
+  {
+    key: "commerce.order.view",
+    domain: "commerce",
+    verb: "view",
+    description: "See digital orders from QR and online channels.",
+  },
+  {
+    key: "commerce.order.manage",
+    domain: "commerce",
+    verb: "manage",
+    description: "Manage digital orders and their status.",
+  },
+  {
+    key: "commerce.booking.view",
+    domain: "commerce",
+    verb: "view",
+    description: "See direct hotel bookings.",
+  },
+  {
+    key: "commerce.booking.manage",
+    domain: "commerce",
+    verb: "manage",
+    description: "Manage direct hotel bookings.",
+  },
+  {
+    key: "commerce.table_request.view",
+    domain: "commerce",
+    verb: "view",
+    description: "See table-side service requests.",
+  },
+  {
+    key: "commerce.table_request.manage",
+    domain: "commerce",
+    verb: "manage",
+    description: "Acknowledge and resolve table requests.",
+  },
+  {
+    key: "commerce.settings.view",
+    domain: "commerce",
+    verb: "view",
+    description: "See commerce feature settings for a property.",
+  },
+  {
+    key: "commerce.settings.manage",
+    domain: "commerce",
+    verb: "manage",
+    description: "Configure commerce feature flags and settings.",
+  },
+  {
+    key: "commerce.analytics.view",
+    domain: "commerce",
+    verb: "view",
+    description: "See commerce analytics and channel performance.",
+  },
+
+  // -------------------------------------------------------------------- enterprise
+  {
+    key: "enterprise.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "Access the enterprise multi-property layer.",
+  },
+  {
+    key: "enterprise.dashboard.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "See the enterprise command center with consolidated metrics.",
+  },
+  {
+    key: "enterprise.reporting.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "View enterprise-level reports across properties.",
+  },
+  {
+    key: "enterprise.reporting.export",
+    domain: "enterprise",
+    verb: "export",
+    description: "Export enterprise reports.",
+  },
+  {
+    key: "enterprise.property.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "See all properties in the organization from the enterprise view.",
+  },
+  {
+    key: "enterprise.property.manage",
+    domain: "enterprise",
+    verb: "manage",
+    description: "Assign properties to groups and manage property-level settings.",
+  },
+  {
+    key: "enterprise.group.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "See property groups and their membership.",
+  },
+  {
+    key: "enterprise.group.manage",
+    domain: "enterprise",
+    verb: "manage",
+    description: "Create, edit and archive property groups.",
+  },
+  {
+    key: "enterprise.alerts.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "See the attention center with aggregated alerts across properties.",
+  },
+  {
+    key: "enterprise.global_search.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "Use enterprise-wide search across all properties.",
+  },
+  {
+    key: "enterprise.master.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "See organization-level master data templates.",
+  },
+  {
+    key: "enterprise.master.manage",
+    domain: "enterprise",
+    verb: "manage",
+    description: "Create and manage organization-level master data templates.",
+  },
+  {
+    key: "enterprise.module_config.view",
+    domain: "enterprise",
+    verb: "view",
+    description: "See which modules are enabled for each property.",
+  },
+  {
+    key: "enterprise.module_config.manage",
+    domain: "enterprise",
+    verb: "manage",
+    description: "Enable or disable modules for individual properties.",
+  },
+
+  // ---------------------------------------------------------------------- billing
+  // SaaS subscription billing (046): the platform's own revenue layer, separate
+  // from the hospitality finance (folios, bills) which tracks the customer's
+  // business transactions. Plan management is platform-only; subscriptions,
+  // billing accounts, invoices and payments are org-scoped.
+  {
+    key: "billing.plan.view",
+    domain: "billing",
+    verb: "view",
+    description: "See the subscription plans the platform offers.",
+  },
+  {
+    key: "billing.plan.manage",
+    domain: "billing",
+    verb: "manage",
+    description: "Create, edit and archive subscription plans (platform admin).",
+  },
+  {
+    key: "billing.subscription.view",
+    domain: "billing",
+    verb: "view",
+    description: "See the organization's subscription, status and billing period.",
+  },
+  {
+    key: "billing.subscription.manage",
+    domain: "billing",
+    verb: "manage",
+    description: "Start, change, upgrade, downgrade or cancel the subscription.",
+  },
+  {
+    key: "billing.account.view",
+    domain: "billing",
+    verb: "view",
+    description: "See the billing account: contact details, address, tax ID.",
+  },
+  {
+    key: "billing.account.manage",
+    domain: "billing",
+    verb: "manage",
+    description: "Edit the billing account details for invoices.",
+  },
+  {
+    key: "billing.invoice.view",
+    domain: "billing",
+    verb: "view",
+    description: "See the organization's SaaS invoices and their lines.",
+  },
+  {
+    key: "billing.invoice.manage",
+    domain: "billing",
+    verb: "manage",
+    description: "Create and void SaaS invoices.",
+  },
+  {
+    key: "billing.payment.view",
+    domain: "billing",
+    verb: "view",
+    description: "See the payments recorded against SaaS invoices.",
+  },
+  {
+    key: "billing.payment.manage",
+    domain: "billing",
+    verb: "manage",
+    description: "Record a payment against a SaaS invoice.",
+  },
+  {
+    key: "billing.usage.view",
+    domain: "billing",
+    verb: "view",
+    description: "See the organization's usage against plan limits.",
+  },
+  {
+    key: "billing.settings.view",
+    domain: "billing",
+    verb: "view",
+    description: "See the platform's billing settings (grace period, due days).",
+  },
+  {
+    key: "billing.settings.manage",
+    domain: "billing",
+    verb: "manage",
+    description: "Edit the platform's billing settings (platform admin).",
+  },
+
+  // -------------------------------------------------------------- notifications
+  {
+    key: "notifications.view",
+    domain: "notifications",
+    verb: "view",
+    description: "See notifications for your organization.",
+  },
+  {
+    key: "notifications.manage",
+    domain: "notifications",
+    verb: "manage",
+    description: "Create, mark read, and archive notifications.",
+  },
+  {
+    key: "notifications.preference.view",
+    domain: "notifications",
+    verb: "view",
+    description: "See your notification delivery preferences.",
+  },
+  {
+    key: "notifications.preference.manage",
+    domain: "notifications",
+    verb: "manage",
+    description: "Change your notification delivery preferences.",
+  },
+
+  // ------------------------------------------------------------- communications
+  {
+    key: "communications.view",
+    domain: "communications",
+    verb: "view",
+    description: "See communication messages (email, SMS, WhatsApp) for your organization.",
+  },
+  {
+    key: "communications.manage",
+    domain: "communications",
+    verb: "manage",
+    description: "Queue and manage outbound communications.",
+  },
+  {
+    key: "communications.template.view",
+    domain: "communications",
+    verb: "view",
+    description: "See notification and communication templates.",
+  },
+  {
+    key: "communications.template.manage",
+    domain: "communications",
+    verb: "manage",
+    description: "Create and edit notification/communication templates.",
+  },
+
+  // ----------------------------------------------------------------- automation
+  {
+    key: "automation.view",
+    domain: "automation",
+    verb: "view",
+    description: "See automation rules for your organization.",
+  },
+  {
+    key: "automation.create",
+    domain: "automation",
+    verb: "create",
+    description: "Create new automation rules.",
+  },
+  {
+    key: "automation.edit",
+    domain: "automation",
+    verb: "edit",
+    description: "Edit automation rule conditions and actions.",
+  },
+  {
+    key: "automation.enable",
+    domain: "automation",
+    verb: "enable",
+    description: "Activate automation rules.",
+  },
+  {
+    key: "automation.disable",
+    domain: "automation",
+    verb: "disable",
+    description: "Deactivate automation rules.",
+  },
+  {
+    key: "automation.history.view",
+    domain: "automation",
+    verb: "view",
+    description: "See automation execution history and logs.",
+  },
+
+  // --------------------------------------------------------------------- analytics
+  // Prompt #18's analytics and reporting engine: KPIs, trends, change detection,
+  // attention center, and domain-specific analytics pages. Reads from existing
+  // operational tables; no competing calculations.
+  {
+    key: "analytics.view",
+    domain: "analytics",
+    verb: "view",
+    description: "Open the analytics module and see the owner command center.",
+  },
+  {
+    key: "analytics.dashboard.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See the owner command center with KPIs, trends and attention items.",
+  },
+  {
+    key: "analytics.kpi.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See key performance indicators and their trends.",
+  },
+  {
+    key: "analytics.revenue.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See revenue analytics and breakdowns by category.",
+  },
+  {
+    key: "analytics.profitability.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See profitability, margins and cost analytics.",
+  },
+  {
+    key: "analytics.restaurant.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See restaurant-specific analytics: covers, ticket size, outlet performance.",
+  },
+  {
+    key: "analytics.hotel.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See hotel-specific analytics: occupancy, ADR, RevPAR.",
+  },
+  {
+    key: "analytics.events.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See events analytics: bookings, revenue, venue utilization.",
+  },
+  {
+    key: "analytics.inventory.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See inventory analytics: stock levels, consumption, wastage.",
+  },
+  {
+    key: "analytics.procurement.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See procurement analytics: spend, supplier performance, lead times.",
+  },
+  {
+    key: "analytics.finance.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See finance analytics: cash flow, receivables, payables.",
+  },
+  {
+    key: "analytics.crm.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See CRM analytics: customer acquisition, retention, segments.",
+  },
+  {
+    key: "analytics.hr.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See HR analytics: headcount, attendance, labor costs.",
+  },
+  {
+    key: "analytics.commerce.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See commerce analytics: channel performance, digital orders.",
+  },
+  {
+    key: "analytics.enterprise.view",
+    domain: "analytics",
+    verb: "view",
+    description: "See enterprise-wide analytics comparing properties.",
+  },
+  {
+    key: "analytics.export",
+    domain: "analytics",
+    verb: "export",
+    description: "Export analytics reports and data.",
+  },
+  // integrations & API platform (050) — 15 tokens for managing external connections
+  {
+    key: "integrations.view",
+    domain: "integrations",
+    verb: "view",
+    description: "See configured integrations and their status.",
+  },
+  {
+    key: "integrations.manage",
+    domain: "integrations",
+    verb: "manage",
+    description: "Create, configure and manage integrations.",
+  },
+  {
+    key: "integrations.connect",
+    domain: "integrations",
+    verb: "connect",
+    description: "Connect new integrations to external systems.",
+  },
+  {
+    key: "integrations.disconnect",
+    domain: "integrations",
+    verb: "disconnect",
+    description: "Disconnect integrations from external systems.",
+  },
+  {
+    key: "integrations.test",
+    domain: "integrations",
+    verb: "test",
+    description: "Test integration connections.",
+  },
+  {
+    key: "integrations.logs.view",
+    domain: "integrations",
+    verb: "view",
+    description: "View integration operation logs.",
+  },
+  {
+    key: "integrations.webhook.view",
+    domain: "integrations",
+    verb: "view",
+    description: "See webhook endpoints and delivery status.",
+  },
+  {
+    key: "integrations.webhook.manage",
+    domain: "integrations",
+    verb: "manage",
+    description: "Create and manage webhook endpoints.",
+  },
+  {
+    key: "integrations.mapping.view",
+    domain: "integrations",
+    verb: "view",
+    description: "See external entity mappings.",
+  },
+  {
+    key: "integrations.mapping.manage",
+    domain: "integrations",
+    verb: "manage",
+    description: "Create and manage external entity mappings.",
+  },
+  {
+    key: "api_keys.view",
+    domain: "integrations",
+    verb: "view",
+    description: "See API keys and their status.",
+  },
+  {
+    key: "api_keys.create",
+    domain: "integrations",
+    verb: "create",
+    description: "Create new API keys.",
+  },
+  {
+    key: "api_keys.revoke",
+    domain: "integrations",
+    verb: "revoke",
+    description: "Revoke API keys.",
+  },
+  {
+    key: "api_keys.rotate",
+    domain: "integrations",
+    verb: "rotate",
+    description: "Rotate API keys.",
+  },
+  {
+    key: "api.access",
+    domain: "integrations",
+    verb: "access",
+    description: "Access the public API.",
   },
 ];
 
