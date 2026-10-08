@@ -124,8 +124,89 @@ export const CLIENT_DOORS = [
   // day's billed / collected / outstanding per currency. The sums are Postgres `numeric`
   // because contract §2 allows exactly one engine for money, including a day total.
   "restaurant_day_overview",
+  // restaurant operations (020) — Prompt #05's kitchen stations, discounts, splits,
+  // shifts, table merges and activity timeline. Station doors manage the physical work
+  // areas; send_kot now routes by station; discounts are audited events; bills split
+  // three ways; shifts track cash per operator per day; merges combine orders.
+  "create_kitchen_station",
+  "update_kitchen_station",
+  "archive_kitchen_station",
+  "apply_order_discount",
+  "split_bill_by_item",
+  "open_restaurant_shift",
+  "close_restaurant_shift",
+  "merge_tables",
+  "order_activity_timeline",
   // development seed only (007)
   "claim_demo_organization",
+  // inventory master data (023) — units of measure, categories, items, locations.
+  // All writes are doors; reads are plain SELECTs under RLS.
+  "create_unit",
+  "update_unit",
+  "archive_unit",
+  "create_unit_conversion",
+  "create_inventory_category",
+  "update_inventory_category",
+  "archive_inventory_category",
+  "create_inventory_item",
+  "update_inventory_item",
+  "set_inventory_item_status",
+  "create_inventory_location",
+  "update_inventory_location",
+  "archive_inventory_location",
+  // stock ledger and operations (024, 025, 026) — immutable ledger, weighted average
+  // costing, recipes, wastage, adjustments, transfers, stock takes, consumption.
+  "post_stock_movement",
+  "reverse_stock_movement",
+  "record_wastage",
+  "record_adjustment",
+  "record_transfer",
+  "create_stock_take",
+  "post_stock_take",
+  "create_recipe",
+  "activate_recipe_version",
+  "calculate_recipe_cost",
+  "set_opening_stock",
+  "consume_for_order",
+  // supplier master data (028) — suppliers, contacts, addresses, supplier-item links,
+  // price history. All writes through doors; reads under RLS.
+  "create_supplier",
+  "update_supplier",
+  "archive_supplier",
+  "set_supplier_status",
+  "create_supplier_contact",
+  "update_supplier_contact",
+  "delete_supplier_contact",
+  "create_supplier_address",
+  "update_supplier_address",
+  "delete_supplier_address",
+  "create_supplier_item",
+  "update_supplier_item",
+  "record_supplier_price",
+  // purchase requests and orders (029) — requisitions, POs with state machine,
+  // line items, charges (freight/transport/etc).
+  "create_purchase_request",
+  "add_purchase_request_items",
+  "set_purchase_request_status",
+  "create_purchase_order",
+  "add_purchase_order_items",
+  "add_purchase_charge",
+  "set_purchase_order_status",
+  "recalculate_purchase_order_totals",
+  // goods receipt (030) — physical receipt against PO, posts RECEIPT to stock ledger.
+  "create_goods_receipt",
+  "add_goods_receipt_items",
+  "post_goods_receipt",
+  "cancel_goods_receipt",
+  // purchase invoices, payments & returns (031) — supplier billing, payment allocation,
+  // purchase returns (post RETURN to stock ledger).
+  "create_purchase_invoice",
+  "add_purchase_invoice_items",
+  "set_purchase_invoice_status",
+  "record_supplier_payment",
+  "allocate_payment_to_invoice",
+  "create_purchase_return",
+  "post_purchase_return",
 ] as const;
 
 export type DoorName = (typeof CLIENT_DOORS)[number];

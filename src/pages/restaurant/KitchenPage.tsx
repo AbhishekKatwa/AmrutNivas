@@ -307,6 +307,7 @@ export default function KitchenPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [action, setAction] = useState<KotAction | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [stationFilter, setStationFilter] = useState<EntityId | null>(null);
 
   useEffect(() => {
     if (status === "idle") void bootstrap();
@@ -480,6 +481,24 @@ export default function KitchenPage() {
   // tile's "12 min" is the same instant for every tile on the screen.
   const nowMs = useMemo(() => Date.now(), [kots, reloadTick]);
 
+  // Station filter: collect distinct stations from the open slips.
+  const stations = useMemo(() => {
+    if (kots === null) return [];
+    const seen = new Map<EntityId, string>();
+    for (const kot of kots) {
+      if (kot.stationId !== null && kot.stationName !== null) {
+        seen.set(kot.stationId, kot.stationName);
+      }
+    }
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [kots]);
+
+  const filteredKots = useMemo(() => {
+    if (kots === null) return null;
+    if (stationFilter === null) return kots;
+    return kots.filter((kot) => kot.stationId === stationFilter);
+  }, [kots, stationFilter]);
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:gap-6">
       <header>
@@ -548,8 +567,38 @@ export default function KitchenPage() {
 
           <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start">
             <div className="flex flex-col gap-4">
+              {stations.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStationFilter(null)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                      stationFilter === null
+                        ? "bg-brand-600 text-white"
+                        : "bg-surface-sunken text-muted hover:bg-surface-hover"
+                    }`}
+                  >
+                    All stations
+                  </button>
+                  {stations.map((station) => (
+                    <button
+                      key={station.id}
+                      type="button"
+                      onClick={() => setStationFilter(station.id)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                        stationFilter === station.id
+                          ? "bg-brand-600 text-white"
+                          : "bg-surface-sunken text-muted hover:bg-surface-hover"
+                      }`}
+                    >
+                      {station.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <KotQueue
-                kots={kots}
+                kots={filteredKots}
                 selectedId={kotId}
                 nowMs={nowMs}
                 onSelect={(id) => {
@@ -700,7 +749,10 @@ function KotQueue({ kots, selectedId, nowMs, onSelect, onReload }: KotQueueProps
                 <StatusPill status={summary.status} />
               </span>
               <span className="text-xs text-muted">
-                {summary.orderNumber} · {slipProgress(summary)}
+                {summary.orderNumber}
+                {summary.stationName !== null ? ` · ${summary.stationName}` : ""}
+                {" · "}
+                {slipProgress(summary)}
               </span>
               <span className="flex items-center gap-1 text-xs text-muted">
                 <Flame className="size-3.5 shrink-0 text-warning" aria-hidden />

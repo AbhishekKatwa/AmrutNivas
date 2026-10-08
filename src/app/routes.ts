@@ -23,10 +23,21 @@ import PosPage from "@/pages/restaurant/PosPage";
 import BillPage from "@/pages/restaurant/BillPage";
 import KitchenPage from "@/pages/restaurant/KitchenPage";
 import RestaurantDayPage from "@/pages/restaurant/RestaurantDayPage";
+import ShiftPage from "@/pages/restaurant/ShiftPage";
+import StationsPage from "@/pages/restaurant/StationsPage";
 import TeamPage from "@/pages/team/TeamPage";
 import RolesPage from "@/pages/access/RolesPage";
 import AuditPage from "@/pages/audit/AuditPage";
 import OnboardingWizard from "@/pages/onboarding/OnboardingWizard";
+import ItemsPage from "@/pages/inventory/ItemsPage";
+import StockPage from "@/pages/inventory/StockPage";
+import MovementsPage from "@/pages/inventory/MovementsPage";
+import LocationsPage from "@/pages/inventory/LocationsPage";
+import RecipesPage from "@/pages/inventory/RecipesPage";
+import WastagePage from "@/pages/inventory/WastagePage";
+import TransfersPage from "@/pages/inventory/TransfersPage";
+import StockTakesPage from "@/pages/inventory/StockTakesPage";
+import InventoryOverviewPage from "@/pages/inventory/InventoryOverviewPage";
 
 export type AppRoute = {
   readonly path: string;
@@ -55,10 +66,21 @@ export const ROUTES: readonly AppRoute[] = [
   { path: "/pos", component: PosPage, permission: "order.view" },
   { path: "/billing", component: BillPage, permission: "bill.view" },
   { path: "/kitchen", component: KitchenPage, permission: "kot.view" },
+  { path: "/shifts", component: ShiftPage, permission: "shift.manage" },
+  { path: "/stations", component: StationsPage, permission: "station.manage" },
   { path: "/restaurant", component: RestaurantDayPage, permission: "restaurant.view" },
   { path: "/team", component: TeamPage, permission: "user.view" },
   { path: "/roles", component: RolesPage, permission: "role.view" },
   { path: "/audit", component: AuditPage, permission: "audit.view" },
+  { path: "/inventory", component: InventoryOverviewPage, permission: "stock.view" },
+  { path: "/inventory/items", component: ItemsPage, permission: "item.view" },
+  { path: "/inventory/stock", component: StockPage, permission: "stock.view" },
+  { path: "/inventory/movements", component: MovementsPage, permission: "stock.view" },
+  { path: "/inventory/locations", component: LocationsPage, permission: "stock.view" },
+  { path: "/inventory/recipes", component: RecipesPage, permission: "recipe.view" },
+  { path: "/inventory/wastage", component: WastagePage, permission: "stock.view" },
+  { path: "/inventory/transfers", component: TransfersPage, permission: "stock.view" },
+  { path: "/inventory/stock-takes", component: StockTakesPage, permission: "stock.view" },
 ];
 
 /**

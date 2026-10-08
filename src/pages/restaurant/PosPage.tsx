@@ -44,6 +44,7 @@ import {
   Plus,
   ShoppingBag,
   Store,
+  Tag,
   Trash2,
   UtensilsCrossed,
   X,
@@ -91,8 +92,10 @@ import {
   type NewOrder,
   type OrderLineInput,
 } from "@/domain/restaurant/order-service";
+import { applyDiscount, type ApplyDiscount } from "@/domain/restaurant/operations-service";
 import {
   ORDER_TYPES,
+  type DiscountType,
   type Menu,
   type MenuCategory,
   type MenuItem,
@@ -502,6 +505,11 @@ export default function PosPage() {
   const [voidingLine, setVoidingLine] = useState<OrderLineDetail | null>(null);
   const [orderAction, setOrderAction] = useState<OrderStatus | null>(null);
   const [moving, setMoving] = useState(false);
+  const [discountOpen, setDiscountOpen] = useState(false);
+  const [discountType, setDiscountType] = useState<DiscountType>("PERCENTAGE");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
+  const [discountBusy, setDiscountBusy] = useState(false);
 
   useEffect(() => {
     if (status === "idle") void bootstrap();
@@ -715,6 +723,32 @@ export default function PosPage() {
     }
   };
 
+  const applyDiscountHandler = async () => {
+    if (ticket === null || discountReason.trim() === "") return;
+    const value = Number(discountValue);
+    if (!Number.isFinite(value) || value <= 0) return;
+    if (discountType === "PERCENTAGE" && value > 100) return;
+    setDiscountBusy(true);
+    try {
+      const payload: ApplyDiscount = {
+        orderId: ticket.order.id,
+        discountType,
+        discountValue: value,
+        reason: discountReason.trim(),
+      };
+      await applyDiscount(payload);
+      setDiscountOpen(false);
+      setDiscountType("PERCENTAGE");
+      setDiscountValue("");
+      setDiscountReason("");
+      afterWrite();
+    } catch (error) {
+      report(error);
+    } finally {
+      setDiscountBusy(false);
+    }
+  };
+
   const applyLineEdit = async (quantity: number, instructions: string) => {
     if (editingLine === null) return;
     try {
@@ -873,6 +907,7 @@ export default function PosPage() {
                 onEditLine={setEditingLine}
                 onVoidLine={setVoidingLine}
                 onMoveTable={() => setMoving(true)}
+                onDiscount={() => setDiscountOpen(true)}
               />
             ) : (
               <Card title="No ticket open">
@@ -936,6 +971,59 @@ export default function PosPage() {
           onClose={() => setMoving(false)}
           onSubmit={applyMove}
         />
+      )}
+
+      {discountOpen && ticket !== null && (
+        <Dialog
+          open={discountOpen}
+          onClose={() => !discountBusy && setDiscountOpen(false)}
+          title={`Apply discount to ${ticket.order.orderNumber}`}
+          description="Discounts are audited rows, not column adjustments. A reason is required."
+        >
+          <div className="flex flex-col gap-4">
+            <Field id="discount-type" label="Type">
+              <SelectInput
+                id="discount-type"
+                value={discountType}
+                onChange={(value) => setDiscountType(value as DiscountType)}
+                options={[
+                  { value: "PERCENTAGE", label: "Percentage (%)" },
+                  { value: "FIXED", label: "Fixed amount" },
+                ]}
+              />
+            </Field>
+            <Field id="discount-value" label="Value" required>
+              <TextInput
+                id="discount-value"
+                type="number"
+                min="0"
+                step={discountType === "PERCENTAGE" ? "1" : "0.01"}
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                placeholder={discountType === "PERCENTAGE" ? "e.g. 10" : "e.g. 50.00"}
+              />
+            </Field>
+            <Field id="discount-reason" label="Reason" required>
+              <Textarea
+                id="discount-reason"
+                rows={2}
+                value={discountReason}
+                onChange={(e) => setDiscountReason(e.target.value)}
+                placeholder="e.g. Customer complaint, staff discount, promo offer"
+              />
+            </Field>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="secondary" onClick={() => setDiscountOpen(false)} disabled={discountBusy}>Cancel</Button>
+              <Button
+                variant="primary"
+                onClick={() => void applyDiscountHandler()}
+                disabled={discountBusy || discountReason.trim() === "" || discountValue === ""}
+              >
+                {discountBusy ? "Applying…" : "Apply discount"}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
       )}
     </div>
   );
@@ -1367,6 +1455,7 @@ type LiveTicketPanelProps = {
   onEditLine: (line: OrderLineDetail) => void;
   onVoidLine: (line: OrderLineDetail) => void;
   onMoveTable: () => void;
+  onDiscount: () => void;
 };
 
 function LiveTicketPanel({
@@ -1381,6 +1470,7 @@ function LiveTicketPanel({
   onEditLine,
   onVoidLine,
   onMoveTable,
+  onDiscount,
 }: LiveTicketPanelProps) {
   const { order, lines } = ticket;
   const capabilities = ticketCapabilities(order);
@@ -1531,6 +1621,17 @@ function LiveTicketPanel({
                 onClick={onVoidOrder}
               >
                 Void ticket
+              </Button>
+            )}
+            {!orderIsTerminal(order.status) && canEdit && (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<Tag className="size-4" aria-hidden />}
+                disabled={busy}
+                onClick={onDiscount}
+              >
+                Discount
               </Button>
             )}
           </div>

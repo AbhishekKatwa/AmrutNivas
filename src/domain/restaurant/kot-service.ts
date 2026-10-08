@@ -113,6 +113,8 @@ function openKotFromWire(raw: Record<string, unknown>): OpenKotSummary {
     status: raw.status as KotStatus,
     firedAt: raw.firedAt as string,
     reprintCount: Number(raw.reprintCount),
+    stationId: (raw.stationId as EntityId) ?? null,
+    stationName: (raw.stationName as string) ?? null,
     firedCount: Number(raw.lineCount),
     readyCount: Number(raw.readyCount),
   };

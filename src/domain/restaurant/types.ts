@@ -806,6 +806,8 @@ export type OpenKotSummary = {
   status: KotStatus;
   firedAt: string;
   reprintCount: number;
+  stationId: EntityId | null;
+  stationName: string | null;
   /** Lines still cooking on this slip. */
   firedCount: number;
   /** Lines the pass has rung up. */
@@ -1141,4 +1143,135 @@ export type MenuItemSnapshot = {
   };
   attributes: Record<string, unknown>;
   modifierGroups: SnapshotModifierGroup[];
+};
+
+/* ============================================================ 020 — operations */
+
+/** A kitchen station's lifecycle (020). Same two values as dining areas and tables. */
+export type KitchenStationStatus = "ACTIVE" | "ARCHIVED";
+
+export const KITCHEN_STATION_STATUSES: readonly KitchenStationStatus[] = ["ACTIVE", "ARCHIVED"];
+
+/**
+ * A physical work area in the kitchen (MAIN KITCHEN, TANDOOR, BAR, BEVERAGE, etc.).
+ * Menu items route to a station; KOTs are station-scoped — one order produces one KOT
+ * per station that has lines to fire.
+ */
+export type KitchenStation = {
+  id: EntityId;
+  organizationId: EntityId;
+  propertyId: EntityId;
+  outletId: EntityId;
+  name: string;
+  code: string;
+  description: string | null;
+  displayOrder: number;
+  status: KitchenStationStatus;
+  archivedAt: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: EntityId | null;
+};
+
+/** A discount's type: percentage off the base, or a fixed amount. */
+export type DiscountType = "PERCENTAGE" | "FIXED";
+
+export const DISCOUNT_TYPES: readonly DiscountType[] = ["PERCENTAGE", "FIXED"];
+
+/**
+ * One discount application on an order or order item (020). Each row is an audited event
+ * with a reason and a permission check — discounts are rows, not columns.
+ */
+export type OrderDiscount = {
+  id: EntityId;
+  organizationId: EntityId;
+  propertyId: EntityId;
+  outletId: EntityId;
+  orderId: EntityId;
+  /** NULL for order-level discounts; set for item-level discounts. */
+  orderItemId: EntityId | null;
+  discountType: DiscountType;
+  /** The percentage (0-100) or fixed amount that was entered. */
+  discountValue: string;
+  /** The calculated discount amount (money as TEXT). */
+  discountAmount: string;
+  reason: string | null;
+  appliedBy: EntityId | null;
+  appliedAt: string;
+  createdAt: string;
+};
+
+/** A bill split's type (020). */
+export type SplitType = "BY_ITEM" | "EQUAL" | "CUSTOM";
+
+export const SPLIT_TYPES: readonly SplitType[] = ["BY_ITEM", "EQUAL", "CUSTOM"];
+
+/**
+ * Audit trail of a bill split: which original bill was split into which new bill (020).
+ */
+export type BillSplit = {
+  id: EntityId;
+  organizationId: EntityId;
+  propertyId: EntityId;
+  outletId: EntityId;
+  originalBillId: EntityId;
+  newBillId: EntityId;
+  splitType: SplitType;
+  splitBy: EntityId | null;
+  createdAt: string;
+};
+
+/** A shift's lifecycle (020). OPEN means the till is active; CLOSED means settled. */
+export type ShiftStatus = "OPEN" | "CLOSED";
+
+export const SHIFT_STATUSES: readonly ShiftStatus[] = ["OPEN", "CLOSED"];
+
+/**
+ * A cashier's shift at the till (020): open/close times, cash in/out, operator.
+ * One outlet can have multiple shifts per day (morning/evening).
+ */
+export type RestaurantShift = {
+  id: EntityId;
+  organizationId: EntityId;
+  propertyId: EntityId;
+  outletId: EntityId;
+  businessDate: string;
+  operatorId: EntityId;
+  openingCash: string;
+  closingCash: string | null;
+  status: ShiftStatus;
+  openedAt: string;
+  closedAt: string | null;
+  notes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Audit trail of a table merge (020): which orders were combined and where they ended up.
+ * The merged order stays on one table; the others are detached.
+ */
+export type TableMerge = {
+  id: EntityId;
+  organizationId: EntityId;
+  propertyId: EntityId;
+  outletId: EntityId;
+  targetTableId: EntityId;
+  sourceTableId: EntityId;
+  targetOrderId: EntityId;
+  sourceOrderId: EntityId;
+  mergedBy: EntityId | null;
+  mergedAt: string;
+  createdAt: string;
+};
+
+/** One event in an order's activity timeline (020). */
+export type OrderActivityEvent = {
+  id: EntityId;
+  eventType: string;
+  eventData: Record<string, unknown> | null;
+  performedBy: EntityId | null;
+  performedAt: string;
 };
