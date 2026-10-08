@@ -448,10 +448,10 @@ CREATE POLICY commerce_settings_modify ON commerce_settings
 
 -- Create commerce channel
 CREATE OR REPLACE FUNCTION app.create_commerce_channel(
-  p_property_id uuid DEFAULT NULL,
-  p_outlet_id uuid DEFAULT NULL,
   p_name text,
   p_type commerce_channel_type,
+  p_property_id uuid DEFAULT NULL,
+  p_outlet_id uuid DEFAULT NULL,
   p_configuration jsonb DEFAULT '{}'::jsonb
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -589,11 +589,11 @@ $$;
 
 -- Create QR code
 CREATE OR REPLACE FUNCTION app.create_qr_code(
+  p_type qr_code_type,
+  p_code text,
   p_property_id uuid DEFAULT NULL,
   p_outlet_id uuid DEFAULT NULL,
   p_table_id uuid DEFAULT NULL,
-  p_type qr_code_type,
-  p_code text,
   p_short_code text DEFAULT NULL,
   p_target_type text DEFAULT NULL,
   p_target_id uuid DEFAULT NULL
@@ -631,9 +631,9 @@ CREATE OR REPLACE FUNCTION app.create_commerce_session(
   p_property_id uuid,
   p_outlet_id uuid,
   p_channel commerce_channel_type,
+  p_session_token text,
   p_table_id uuid DEFAULT NULL,
   p_customer_id uuid DEFAULT NULL,
-  p_session_token text,
   p_expires_at timestamptz DEFAULT NULL,
   p_metadata jsonb DEFAULT '{}'::jsonb
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -670,8 +670,8 @@ CREATE OR REPLACE FUNCTION app.create_table_request(
   p_property_id uuid,
   p_outlet_id uuid,
   p_table_id uuid,
-  p_commerce_session_id uuid DEFAULT NULL,
   p_type table_request_type,
+  p_commerce_session_id uuid DEFAULT NULL,
   p_message text DEFAULT NULL
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -708,15 +708,15 @@ $$;
 
 -- Add delivery address
 CREATE OR REPLACE FUNCTION app.add_delivery_address(
-  p_customer_id uuid DEFAULT NULL,
   p_name text,
   p_mobile text,
   p_address_line1 text,
-  p_address_line2 text DEFAULT NULL,
-  p_landmark text DEFAULT NULL,
   p_city text,
   p_state text,
   p_postal_code text,
+  p_customer_id uuid DEFAULT NULL,
+  p_address_line2 text DEFAULT NULL,
+  p_landmark text DEFAULT NULL,
   p_latitude numeric DEFAULT NULL,
   p_longitude numeric DEFAULT NULL,
   p_label delivery_address_label DEFAULT 'HOME'

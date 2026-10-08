@@ -416,6 +416,10 @@ export default function OnboardingWizard() {
   const permission = stepPermissionFor(state.step);
   const allowed = permission === null ? true : can(permission);
 
+  // Dev bypass: skip Supabase doors entirely — no session exists to authenticate them.
+  const isDevBypass =
+    import.meta.env.DEV && sessionStorage.getItem("dev-bypass-auth") === "true";
+
   // Run one door: throw surfaces its message (and the field it names), success advances.
   async function runDoor<T>(call: () => Promise<T>, onOk: (row: T) => void) {
     setBusy(true);
@@ -437,6 +441,15 @@ export default function OnboardingWizard() {
   }
 
   function claimDemo() {
+    if (isDevBypass) {
+      // Use the store's already-claimed demo org; bootstrap seeded it.
+      const storeOrg = useContextStore.getState().organization;
+      if (storeOrg !== null) {
+        setState((previous) => ({ ...previous, organization: storeOrg }));
+        setState((previous) => advance(previous, false));
+        return;
+      }
+    }
     void runDoor(claimDemoEstate, (organization) => {
       setState((previous) => ({ ...previous, organization }));
     });
@@ -473,6 +486,45 @@ export default function OnboardingWizard() {
       // A real tenant is never demo: only the seed path may carry that label.
       isDemo: false,
     };
+    if (isDevBypass) {
+      const mockOrg: Organization = {
+        id: `org-${Date.now()}`,
+        name: input.name,
+        legalName: input.legalName ?? null,
+        displayName: input.name,
+        code: input.code,
+        slug: input.slug,
+        businessTypes: input.businessTypes ?? [],
+        status: "ACTIVE",
+        country: input.country,
+        currency: input.currency,
+        timezone: input.timezone,
+        locale: input.locale,
+        taxRegion: null,
+        phone: input.phone ?? null,
+        email: input.email ?? null,
+        website: null,
+        logoUrl: null,
+        isDemo: false,
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        archivedAt: null,
+      };
+      // Persist so bootstrap restores this after navigation
+      sessionStorage.setItem("dev-bypass-org", mockOrg.id);
+      sessionStorage.setItem("dev-bypass-org-data", JSON.stringify(mockOrg));
+      // Update the store's context to point at the new org
+      useContextStore.getState().switchContext({
+        organizationId: mockOrg.id,
+        propertyId: null,
+        outletId: null,
+      }).catch(() => {});
+      setState((previous) => ({ ...previous, organization: mockOrg }));
+      setSite(blankSite(org));
+      setState((previous) => advance(previous, false));
+      return;
+    }
     void runDoor(() => createOrganization(input), (organization) => {
       setState((previous) => ({ ...previous, organization }));
       setSite(blankSite(org));
@@ -495,6 +547,38 @@ export default function OnboardingWizard() {
       addressLine1: site.addressLine1 || undefined,
       city: site.city || undefined,
     };
+    if (isDevBypass) {
+      const mockProperty: Property = {
+        id: `prop-${Date.now()}`,
+        organizationId: state.organization.id,
+        name: input.name,
+        displayName: input.name,
+        code: input.code,
+        slug: input.slug,
+        type: input.type,
+        status: "ACTIVE",
+        country: input.country,
+        currency: input.currency,
+        timezone: input.timezone,
+        locale: input.locale,
+        businessDayStart: input.businessDayStart ?? "00:00",
+        addressLine1: input.addressLine1 ?? null,
+        addressLine2: null,
+        city: input.city ?? null,
+        state: null,
+        postalCode: null,
+        phone: null,
+        email: null,
+        taxProfileId: null,
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        archivedAt: null,
+      };
+      setState((previous) => ({ ...previous, property: mockProperty }));
+      setState((previous) => advance(previous, false));
+      return;
+    }
     void runDoor(() => createProperty(input), (property) =>
       setState((previous) => ({ ...previous, property })),
     );
@@ -509,6 +593,28 @@ export default function OnboardingWizard() {
       slug: outlet.slug,
       type: outlet.type as OutletType,
     };
+    if (isDevBypass) {
+      const mockOutlet: Outlet = {
+        id: `out-${Date.now()}`,
+        organizationId: state.organization!.id,
+        propertyId: state.property.id,
+        name: input.name,
+        code: input.code,
+        slug: input.slug,
+        type: input.type,
+        status: "ACTIVE",
+        businessHours: {},
+        phone: null,
+        email: null,
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        archivedAt: null,
+      };
+      setState((previous) => ({ ...previous, outlet: mockOutlet }));
+      setState((previous) => advance(previous, false));
+      return;
+    }
     void runDoor(() => createOutlet(input), (created) =>
       setState((previous) => ({ ...previous, outlet: created })),
     );
@@ -529,6 +635,24 @@ export default function OnboardingWizard() {
       slug: department.slug,
       outletId: state.outlet?.id ?? null,
     };
+    if (isDevBypass) {
+      const mockDepartment: Department = {
+        id: `dept-${Date.now()}`,
+        organizationId: state.organization!.id,
+        propertyId: state.property.id,
+        outletId: input.outletId ?? null,
+        name: input.name,
+        code: input.code,
+        slug: input.slug,
+        status: "ACTIVE",
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setState((previous) => ({ ...previous, department: mockDepartment }));
+      setState((previous) => advance(previous, false));
+      return;
+    }
     void runDoor(() => createDepartment(input), (created) =>
       setState((previous) => ({ ...previous, department: created })),
     );

@@ -465,11 +465,11 @@ ON CONFLICT DO NOTHING;
 -- Record a domain event.
 create or replace function public.record_domain_event(
   p_organization uuid,
-  p_property uuid default null,
-  p_outlet uuid default null,
   p_event_type text,
   p_entity_type text,
   p_entity_id uuid,
+  p_property uuid default null,
+  p_outlet uuid default null,
   p_actor_user uuid default null,
   p_metadata jsonb default '{}'::jsonb
 )
@@ -505,13 +505,13 @@ $$;
 -- Create a notification.
 create or replace function public.create_notification(
   p_organization uuid,
+  p_type text,
+  p_title text,
+  p_message text,
   p_property uuid default null,
   p_outlet uuid default null,
   p_recipient_user uuid default null,
-  p_type text,
   p_severity text default 'NORMAL',
-  p_title text,
-  p_message text,
   p_reference_type text default null,
   p_reference_id uuid default null
 )
@@ -655,12 +655,12 @@ $$;
 
 -- Create a notification template.
 create or replace function public.create_notification_template(
-  p_organization uuid default null,
   p_event_type text,
   p_channel text,
   p_name text,
-  p_subject text default null,
   p_body text,
+  p_organization uuid default null,
+  p_subject text default null,
   p_variables jsonb default '[]'::jsonb,
   p_status text default 'ACTIVE'
 )
@@ -729,11 +729,11 @@ $$;
 create or replace function public.queue_communication_message(
   p_organization uuid,
   p_recipient_type text,
-  p_recipient_id uuid default null,
   p_channel text,
+  p_body text,
+  p_recipient_id uuid default null,
   p_template_id uuid default null,
   p_subject text default null,
-  p_body text,
   p_scheduled_at timestamptz default null
 )
 returns jsonb
@@ -766,8 +766,8 @@ $$;
 create or replace function public.create_automation_rule(
   p_organization uuid,
   p_name text,
-  p_description text default null,
   p_event_type text,
+  p_description text default null,
   p_conditions jsonb default '[]'::jsonb,
   p_actions jsonb default '[]'::jsonb,
   p_status text default 'DRAFT'

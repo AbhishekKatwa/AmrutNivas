@@ -54,6 +54,12 @@ function RouteGate({ permission, children }: GateProps) {
   // is the honest one, so the page renders.
   if (status === "unconfigured") return <>{children}</>;
 
+  // No organization resolved yet: the page itself decides what to show (e.g. the
+  // "Use the demo estate" prompt on /organization). Denying here would trap a person
+  // who is signed in but has no tenant — they could never reach the page that helps.
+  const organizationId = useContextStore.getState().context.organizationId;
+  if (organizationId === null) return <>{children}</>;
+
   if (decision.allowed) return <>{children}</>;
   return <AccessDeniedScreen reason={decision.reason} />;
 }

@@ -149,6 +149,7 @@ create policy room_rates_no_write on public.room_rates
 -- =================================================================== doors
 
 -- create_rate_plan
+drop function if exists public.create_rate_plan(uuid, uuid, text, text, text, text, jsonb, text, boolean, text);
 create or replace function public.create_rate_plan(
   p_organization       uuid,
   p_property           uuid,

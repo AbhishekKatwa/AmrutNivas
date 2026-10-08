@@ -116,7 +116,7 @@ comment on column public.roles.is_system is
 create table if not exists public.role_permissions (
   id          uuid primary key default gen_random_uuid(),
   role_id     uuid not null references public.roles(id) on delete cascade,
-  permission  text not null check (permission ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
+  permission  text not null check (permission ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'),
   created_at  timestamptz not null default now(),
   unique (role_id, permission)
 );

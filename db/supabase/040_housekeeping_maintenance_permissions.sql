@@ -11,6 +11,12 @@
 --   STORE_MANAGER — read-only housekeeping/maintenance, view lost & found
 --   STAFF — minimal: view housekeeping and maintenance boards
 
+-- Widen the permission CHECK to allow multi-segment tokens (e.g. housekeeping.task.create).
+-- The original constraint (from 002) only allowed `domain.verb`; later modules use deeper paths.
+alter table public.role_permissions drop constraint if exists role_permissions_permission_check;
+alter table public.role_permissions add constraint role_permissions_permission_check
+  check (permission ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$');
+
 do $$
 declare
   v_tokens text[] := array[
@@ -50,7 +56,7 @@ begin
   perform app.require_valid(array_length(v_tokens, 1) = 28, 'NIVAAS_PERMISSION_SEED_BROKEN');
   perform app.require_valid(
     not exists (select t from unnest(v_tokens) t
-                 where t !~ E'^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$'),
+                 where t !~ E'^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$'),
     'NIVAAS_PERMISSION_SEED_BROKEN');
 end;
 $$;
@@ -194,9 +200,9 @@ begin
     'lost_found.view', 'lost_found.create', 'lost_found.return',
     'asset.view', 'asset.create', 'asset.edit'
   );
-  -- ORG_OWNER=28, ORG_ADMIN=28, GENERAL_MANAGER=26, PROPERTY_MANAGER=26,
-  -- RESTAURANT_MANAGER=4, STORE_MANAGER=3, STAFF=2 → 117 total
-  perform app.require_valid(v_count = 117,
-    'NIVAAS_PERMISSION_COUNT: expected 117 housekeeping/maintenance grants, got ' || v_count);
+  -- ORG_OWNER=28, ORG_ADMIN=28, GENERAL_MANAGER=27, PROPERTY_MANAGER=27,
+  -- RESTAURANT_MANAGER=4, STORE_MANAGER=3, STAFF=2 → 119 total
+  perform app.require_valid(v_count = 119,
+    'NIVAAS_PERMISSION_COUNT: expected 119 housekeeping/maintenance grants, got ' || v_count);
 end;
 $$;

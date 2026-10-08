@@ -51,6 +51,8 @@ import {
   type Permission,
   type PermissionSet,
 } from "@/domain/identity/types";
+import { PERMISSION_KEYS } from "@/domain/identity/permissions";
+import { seedDemoEstate } from "./demo-data";
 import { AppError, toPublicError } from "@/lib/errors";
 import { getSupabase, backendUnavailableReason } from "@/db/client";
 import { tokenOf } from "@/db/door-errors";
@@ -213,6 +215,59 @@ export const useContextStore = create<ContextState>()((set, get) => {
     async bootstrap() {
       const mine = claim();
 
+      // DEV MODE: Complete bypass for testing - skip all auth checks
+      if (import.meta.env.DEV && sessionStorage.getItem("dev-bypass-auth") === "true") {
+        // Auto-claim the demo estate on first boot so the user always has an org.
+        // The OnboardingWizard's create/claim doors hit Supabase directly, which has
+        // no session in bypass mode — pre-seating the org avoids that dead end.
+        let claimedOrg = sessionStorage.getItem("dev-bypass-org");
+        let mockOrg: Organization | null = null;
+        if (claimedOrg === null) {
+          // Seed the full demo estate on first sign-in
+          const estate = seedDemoEstate();
+          mockOrg = estate.organization;
+          claimedOrg = estate.organization.id;
+          sessionStorage.setItem("dev-bypass-org", claimedOrg);
+          sessionStorage.setItem("dev-bypass-org-data", JSON.stringify(mockOrg));
+          sessionStorage.setItem("dev-bypass-properties", JSON.stringify(estate.properties));
+          sessionStorage.setItem("dev-bypass-outlets", JSON.stringify(estate.outlets));
+          sessionStorage.setItem("dev-bypass-departments", JSON.stringify(estate.departments));
+        } else {
+          const orgData = sessionStorage.getItem("dev-bypass-org-data");
+          if (orgData) {
+            try {
+              mockOrg = JSON.parse(orgData) as Organization;
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+
+        const mockContext: ActiveContext = {
+          signedIn: true,
+          organizationId: claimedOrg,
+          propertyId: null,
+          outletId: null,
+          cleared: false,
+        };
+        const mockPermissions: PermissionSet = {
+          organizationId: claimedOrg,
+          propertyId: null,
+          outletId: null,
+          permissions: [...PERMISSION_KEYS],
+        };
+
+        activateScope(scopeFor(mockContext));
+        set({
+          status: "ready",
+          context: mockContext,
+          permissions: mockPermissions,
+          organization: mockOrg,
+          error: null,
+        });
+        return;
+      }
+
       // No data plane: this is the "preview build ships without a project" path. We must
       // return WITHOUT touching a door. `getSupabase()` is the authoritative signal in
       // test and at runtime; `backendUnavailableReason()` alone reads env only, so a stub
@@ -314,6 +369,59 @@ export const useContextStore = create<ContextState>()((set, get) => {
     },
 
     async claimDemo() {
+      // DEV MODE: skip Supabase RPCs when the auth bypass is active
+      if (import.meta.env.DEV && sessionStorage.getItem("dev-bypass-auth") === "true") {
+        const mockOrg: Organization = {
+          id: "dev-org",
+          name: "Demo Estate",
+          legalName: null,
+          displayName: "Demo Estate",
+          code: "DEMO",
+          slug: "demo-estate",
+          businessTypes: [],
+          status: "ACTIVE",
+          country: "IN",
+          currency: "INR",
+          timezone: "Asia/Kolkata",
+          locale: "en-IN",
+          taxRegion: null,
+          phone: null,
+          email: null,
+          website: null,
+          logoUrl: null,
+          isDemo: true,
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          archivedAt: null,
+        };
+        const mockContext: ActiveContext = {
+          signedIn: true,
+          organizationId: "dev-org",
+          propertyId: null,
+          outletId: null,
+          cleared: false,
+        };
+        const mockPermissions: PermissionSet = {
+          organizationId: "dev-org",
+          propertyId: null,
+          outletId: null,
+          permissions: [...PERMISSION_KEYS],
+        };
+        // Persist so bootstrap restores this after navigation
+        sessionStorage.setItem("dev-bypass-org", "dev-org");
+        sessionStorage.setItem("dev-bypass-org-data", JSON.stringify(mockOrg));
+        activateScope(scopeFor(mockContext));
+        set({
+          status: "ready",
+          context: mockContext,
+          permissions: mockPermissions,
+          organization: mockOrg,
+          error: null,
+        });
+        return;
+      }
+
       const mine = claim();
       set({ status: "loading", error: null });
       try {
@@ -362,6 +470,13 @@ export const useContextStore = create<ContextState>()((set, get) => {
         await signOutSession();
       } catch (error) {
         failure = toPublicError(error).message;
+      }
+      // DEV: clear bypass flags so sign-out is a clean return to the sign-in page
+      if (import.meta.env.DEV) {
+        sessionStorage.removeItem("dev-bypass-auth");
+        sessionStorage.removeItem("dev-bypass-email");
+        sessionStorage.removeItem("dev-bypass-org");
+        sessionStorage.removeItem("dev-bypass-org-data");
       }
       applySignedOut(failure);
     },

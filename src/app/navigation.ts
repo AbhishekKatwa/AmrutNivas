@@ -52,6 +52,13 @@ export const PHASE_LABELS = {
   8: "Commerce",
   9: "Enterprise",
   10: "AI",
+  11: "Platform",
+  12: "Workflows",
+  13: "Revenue",
+  14: "Supply Chain",
+  15: "Guest Experience",
+  16: "Marketing",
+  17: "Guest Portal",
 } as const satisfies Record<number, string>;
 
 export function phaseLabel(phase: number): string {
@@ -102,6 +109,12 @@ export const NAVIGATION: readonly NavGroup[] = [
       { labelKey: "nav.operations.event_leads", path: "/events/leads", phase: 6, available: true },
       { labelKey: "nav.operations.events_list", path: "/events/list", phase: 6, available: true },
       { labelKey: "nav.operations.event_venues", path: "/events/venues", phase: 6, available: true },
+      // Prompt #26's operational workflow layer: task board, personal work view,
+      // and approval center. One canonical task overlay, multi-step workflows,
+      // and approval requests with delegation.
+      { labelKey: "nav.operations.task_board", path: "/operations/tasks", phase: 12, available: true },
+      { labelKey: "nav.operations.my_work", path: "/my-work", phase: 12, available: true },
+      { labelKey: "nav.operations.approvals", path: "/approvals", phase: 12, available: true },
     ],
   },
   {
@@ -214,6 +227,82 @@ export const NAVIGATION: readonly NavGroup[] = [
     ],
   },
   {
+    labelKey: "nav.revenue",
+    items: [
+      // Prompt #27's revenue management surface: dashboard, promotions, price history,
+      // and rate calendar. One pricing engine, one rate-plan architecture, one promotion
+      // architecture. Deterministic recommendations, never autonomous pricing.
+      { labelKey: "nav.revenue.dashboard", path: "/revenue", phase: 13, available: true },
+      { labelKey: "nav.revenue.promotions", path: "/revenue/promotions", phase: 13, available: true },
+      { labelKey: "nav.revenue.price_history", path: "/revenue/price-history", phase: 13, available: true },
+      { labelKey: "nav.revenue.rate_calendar", path: "/hotel/revenue/rates", phase: 13, available: true },
+    ],
+  },
+  {
+    labelKey: "nav.procurement",
+    items: [
+      // Prompt #28's supply chain & procurement surface: dashboard, intelligence,
+      // supplier 360, and procurement calendar. One intelligence layer on top of
+      // the existing procurement domain — no second supplier or inventory system.
+      { labelKey: "nav.procurement.dashboard", path: "/procurement", phase: 14, available: true },
+      { labelKey: "nav.procurement.intelligence", path: "/procurement/intelligence", phase: 14, available: true },
+      { labelKey: "nav.procurement.calendar", path: "/procurement/calendar", phase: 14, available: true },
+    ],
+  },
+  {
+    labelKey: "nav.experience",
+    items: [
+      // Prompt #29's guest experience surface: dashboard, feedback, complaints,
+      // analytics, domain-specific experience, and service quality. Extends CRM
+      // entities with an operational overlay for closed-loop experience management.
+      { labelKey: "nav.experience.dashboard", path: "/experience", phase: 15, available: true },
+      { labelKey: "nav.experience.feedback", path: "/experience/feedback", phase: 15, available: true },
+      { labelKey: "nav.experience.complaints", path: "/experience/complaints", phase: 15, available: true },
+      { labelKey: "nav.experience.analytics", path: "/experience/analytics", phase: 15, available: true },
+      { labelKey: "nav.experience.hotel", path: "/experience/hotel", phase: 15, available: true },
+      { labelKey: "nav.experience.restaurant", path: "/experience/restaurant", phase: 15, available: true },
+      { labelKey: "nav.experience.events", path: "/experience/events", phase: 15, available: true },
+      { labelKey: "nav.experience.service_quality", path: "/experience/service-quality", phase: 15, available: true },
+    ],
+  },
+  {
+    labelKey: "nav.marketing",
+    items: [
+      // Prompt #30's marketing surface: dashboard, campaigns, audiences, offers,
+      // analytics, and settings. Campaign lifecycle with dynamic/snapshot audiences,
+      // multi-channel messages, offer redemption, and attribution tracking.
+      { labelKey: "nav.marketing.dashboard", path: "/marketing", phase: 16, available: true },
+      { labelKey: "nav.marketing.campaigns", path: "/marketing/campaigns", phase: 16, available: true },
+      { labelKey: "nav.marketing.audiences", path: "/marketing/audiences", phase: 16, available: true },
+      { labelKey: "nav.marketing.offers", path: "/marketing/offers", phase: 16, available: true },
+      { labelKey: "nav.marketing.analytics", path: "/marketing/analytics", phase: 16, available: true },
+      { labelKey: "nav.marketing.settings", path: "/marketing/settings", phase: 16, available: true },
+    ],
+  },
+  {
+    labelKey: "nav.guest_portal",
+    items: [
+      // Prompt #31's digital guest journey & portal: customer-facing experience layer
+      // overlaying PMS, restaurant, events, CRM, and loyalty. Guest sees "My Trip,
+      // My Stay, My Orders" instead of internal module names.
+      { labelKey: "nav.guest_portal.dashboard", path: "/guest", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.bookings", path: "/guest/bookings", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.stay", path: "/guest/stay", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.dining", path: "/guest/dining", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.requests", path: "/guest/requests", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.bills", path: "/guest/bills", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.rewards", path: "/guest/rewards", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.offers", path: "/guest/offers", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.events", path: "/guest/events", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.feedback", path: "/guest/feedback", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.profile", path: "/guest/profile", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.checkin", path: "/guest/checkin", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.concierge", path: "/guest/concierge", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.notifications", path: "/guest/notifications", phase: 17, available: true },
+      { labelKey: "nav.guest_portal.timeline", path: "/guest/timeline", phase: 17, available: true },
+    ],
+  },
+  {
     labelKey: "nav.administration",
     items: [
       // Prompt #02's hierarchy and access screens. Each is `available` because the route
@@ -228,7 +317,7 @@ export const NAVIGATION: readonly NavGroup[] = [
       { labelKey: "nav.administration.team", path: "/team", phase: 0, available: true },
       { labelKey: "nav.administration.roles", path: "/roles", phase: 0, available: true },
       { labelKey: "nav.administration.audit", path: "/audit", phase: 0, available: true },
-      { labelKey: "nav.administration.settings", phase: 0, available: false },
+      { labelKey: "nav.administration.settings", path: "/settings", phase: 0, available: true },
     ],
   },
   {
@@ -264,6 +353,22 @@ export const NAVIGATION: readonly NavGroup[] = [
       // connections (payment, messaging, booking, accounting, etc.), webhooks,
       // and API keys. Provider adapters abstract vendor-specific complexity.
       { labelKey: "nav.integrations.settings", path: "/integrations", phase: 10, available: true },
+    ],
+  },
+  {
+    labelKey: "nav.platform",
+    items: [
+      // Prompt #22's platform admin layer: internal operations for the AMRUT NIVAAS
+      // SaaS platform itself. Dashboard, organization management, support center,
+      // security incidents, system health, announcements, and feature flags.
+      // Gated on platform.* permissions — separate from organization ownership.
+      { labelKey: "nav.platform.dashboard", path: "/platform", phase: 11, available: true },
+      { labelKey: "nav.platform.organizations", path: "/platform/organizations", phase: 11, available: true },
+      { labelKey: "nav.platform.support", path: "/platform/support", phase: 11, available: true },
+      { labelKey: "nav.platform.security", path: "/platform/security", phase: 11, available: true },
+      { labelKey: "nav.platform.health", path: "/platform/health", phase: 11, available: true },
+      { labelKey: "nav.platform.announcements", path: "/platform/announcements", phase: 11, available: true },
+      { labelKey: "nav.platform.settings", path: "/platform/settings", phase: 11, available: true },
     ],
   },
 ];

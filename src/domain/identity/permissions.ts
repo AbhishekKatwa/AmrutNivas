@@ -101,7 +101,17 @@ export type PermissionDomain =
   | "communications"
   | "automation"
   | "analytics"
-  | "integrations";
+  | "integrations"
+  | "documents"
+  | "settings"
+  | "task"
+  | "approval"
+  | "workflow"
+  | "revenue"
+  | "supply_chain"
+  | "experience"
+  | "marketing"
+  | "guest_experience";
 
 export type PermissionEntry = {
   /** The exact `domain.verb` string a `role_permissions` row stores. */
@@ -2573,6 +2583,685 @@ export const PERMISSION_CATALOGUE: readonly PermissionEntry[] = [
     domain: "integrations",
     verb: "access",
     description: "Access the public API.",
+  },
+  // ---------------------------------------------------------------- documents
+  {
+    key: "documents.view",
+    domain: "documents",
+    verb: "view",
+    description: "View documents and document center.",
+  },
+  {
+    key: "documents.upload",
+    domain: "documents",
+    verb: "upload",
+    description: "Upload new documents.",
+  },
+  {
+    key: "documents.create",
+    domain: "documents",
+    verb: "create",
+    description: "Create document records.",
+  },
+  {
+    key: "documents.edit",
+    domain: "documents",
+    verb: "edit",
+    description: "Edit document metadata.",
+  },
+  {
+    key: "documents.archive",
+    domain: "documents",
+    verb: "archive",
+    description: "Archive documents.",
+  },
+  {
+    key: "documents.delete",
+    domain: "documents",
+    verb: "delete",
+    description: "Delete documents.",
+  },
+  {
+    key: "documents.download",
+    domain: "documents",
+    verb: "download",
+    description: "Download documents.",
+  },
+  {
+    key: "documents.share",
+    domain: "documents",
+    verb: "share",
+    description: "Share documents with external parties.",
+  },
+  {
+    key: "documents.manage_templates",
+    domain: "documents",
+    verb: "manage",
+    description: "Create and manage document templates.",
+  },
+  {
+    key: "documents.generate",
+    domain: "documents",
+    verb: "generate",
+    description: "Generate documents from templates.",
+  },
+  {
+    key: "documents.export",
+    domain: "documents",
+    verb: "export",
+    description: "Export documents.",
+  },
+  // -------------------------------------------------------------------- workflow
+  // Prompt #26's operational workflow, task and approval layer. One canonical task
+  // overlay wraps domain-specific tasks; workflows orchestrate multi-step processes;
+  // approvals gate sensitive decisions. All in-memory for now.
+  {
+    key: "task.view",
+    domain: "task",
+    verb: "view",
+    description: "See operational tasks on the task board and personal work view.",
+  },
+  {
+    key: "task.create",
+    domain: "task",
+    verb: "create",
+    description: "Create a new operational task.",
+  },
+  {
+    key: "task.assign",
+    domain: "task",
+    verb: "assign",
+    description: "Assign a task to a team or person.",
+  },
+  {
+    key: "task.start",
+    domain: "task",
+    verb: "start",
+    description: "Start working on an assigned task.",
+  },
+  {
+    key: "task.complete",
+    domain: "task",
+    verb: "complete",
+    description: "Mark a task as completed.",
+  },
+  {
+    key: "task.cancel",
+    domain: "task",
+    verb: "cancel",
+    description: "Cancel a task with a recorded reason.",
+  },
+  {
+    key: "task.reassign",
+    domain: "task",
+    verb: "reassign",
+    description: "Reassign a task to a different team or person.",
+  },
+  {
+    key: "approval.view",
+    domain: "approval",
+    verb: "view",
+    description: "See approval requests in the approval center.",
+  },
+  {
+    key: "approval.approve",
+    domain: "approval",
+    verb: "approve",
+    description: "Approve a pending approval request.",
+  },
+  {
+    key: "approval.reject",
+    domain: "approval",
+    verb: "reject",
+    description: "Reject an approval request with a reason.",
+  },
+  {
+    key: "approval.delegate",
+    domain: "approval",
+    verb: "delegate",
+    description: "Delegate an approval to another person.",
+  },
+  {
+    key: "workflow.view",
+    domain: "workflow",
+    verb: "view",
+    description: "See workflow instances and their step progress.",
+  },
+  {
+    key: "workflow.manage",
+    domain: "workflow",
+    verb: "manage",
+    description: "Start, pause, resume and cancel workflow instances.",
+  },
+  {
+    key: "workflow.create",
+    domain: "workflow",
+    verb: "create",
+    description: "Trigger a new workflow instance.",
+  },
+  // ---------------------------------------------------------------- settings
+  {
+    key: "settings.view",
+    domain: "settings",
+    verb: "view",
+    description: "View business configuration and settings.",
+  },
+  {
+    key: "settings.edit",
+    domain: "settings",
+    verb: "edit",
+    description: "Edit business configuration settings.",
+  },
+  {
+    key: "settings.edit_sensitive",
+    domain: "settings",
+    verb: "edit",
+    description: "Edit sensitive settings (discounts, approvals, finance).",
+  },
+  {
+    key: "settings.edit_critical",
+    domain: "settings",
+    verb: "edit",
+    description: "Edit critical settings (security, backdated transactions).",
+  },
+  {
+    key: "settings.view_audit",
+    domain: "settings",
+    verb: "view",
+    description: "View configuration change history.",
+  },
+  {
+    key: "settings.rollback",
+    domain: "settings",
+    verb: "edit",
+    description: "Rollback settings to previous values.",
+  },
+
+  // ---------------------------------------------------------------------- revenue
+  // Prompt #27's revenue management layer: pricing, rate plans, promotions,
+  // demand signals, yield recommendations, price history, and what-if simulations.
+  // No autonomous pricing — every recommendation is "suggested review", the owner decides.
+  {
+    key: "revenue.view",
+    domain: "revenue",
+    verb: "view",
+    description: "See the revenue management dashboard with pricing insights.",
+  },
+  {
+    key: "revenue.pricing.view",
+    domain: "revenue",
+    verb: "view",
+    description: "See price calculations, history, and rate plans.",
+  },
+  {
+    key: "revenue.pricing.edit",
+    domain: "revenue",
+    verb: "edit",
+    description: "Update base prices, rate plans, and channel pricing.",
+  },
+  {
+    key: "revenue.promotion.view",
+    domain: "revenue",
+    verb: "view",
+    description: "See promotions and their usage.",
+  },
+  {
+    key: "revenue.promotion.create",
+    domain: "revenue",
+    verb: "create",
+    description: "Create new promotions and discount campaigns.",
+  },
+  {
+    key: "revenue.promotion.edit",
+    domain: "revenue",
+    verb: "edit",
+    description: "Edit active promotions and their terms.",
+  },
+  {
+    key: "revenue.demand.view",
+    domain: "revenue",
+    verb: "view",
+    description: "See demand signals and occupancy analysis.",
+  },
+  {
+    key: "revenue.recommendation.view",
+    domain: "revenue",
+    verb: "view",
+    description: "See revenue recommendations and yield intelligence.",
+  },
+  {
+    key: "revenue.recommendation.review",
+    domain: "revenue",
+    verb: "review",
+    description: "Accept or reject revenue recommendations.",
+  },
+  {
+    key: "revenue.simulation.create",
+    domain: "revenue",
+    verb: "create",
+    description: "Run what-if pricing simulations.",
+  },
+  {
+    key: "revenue.guardrails.edit",
+    domain: "revenue",
+    verb: "edit",
+    description: "Configure pricing guardrails and approval thresholds.",
+  },
+  // Supply chain intelligence (Prompt #28) — procurement intelligence, supplier management, cost analytics.
+  {
+    key: "supply_chain.view",
+    domain: "supply_chain",
+    verb: "view",
+    description: "View the procurement dashboard and supply chain intelligence.",
+  },
+  {
+    key: "supply_chain.intelligence.view",
+    domain: "supply_chain",
+    verb: "view",
+    description: "View procurement cost intelligence and spend analytics.",
+  },
+  {
+    key: "supply_chain.supplier.view",
+    domain: "supply_chain",
+    verb: "view",
+    description: "View supplier 360 profiles and performance scorecards.",
+  },
+  {
+    key: "supply_chain.issue.view",
+    domain: "supply_chain",
+    verb: "view",
+    description: "View supplier issues and quality tracking.",
+  },
+  {
+    key: "supply_chain.issue.create",
+    domain: "supply_chain",
+    verb: "create",
+    description: "Create supplier issue reports.",
+  },
+  {
+    key: "supply_chain.issue.resolve",
+    domain: "supply_chain",
+    verb: "resolve",
+    description: "Resolve or close supplier issues.",
+  },
+  {
+    key: "supply_chain.contract.view",
+    domain: "supply_chain",
+    verb: "view",
+    description: "View supplier contracts and terms.",
+  },
+  {
+    key: "supply_chain.contract.create",
+    domain: "supply_chain",
+    verb: "create",
+    description: "Create supplier contracts.",
+  },
+  {
+    key: "supply_chain.plan.view",
+    domain: "supply_chain",
+    verb: "view",
+    description: "View purchase plans and reorder suggestions.",
+  },
+  {
+    key: "supply_chain.plan.create",
+    domain: "supply_chain",
+    verb: "create",
+    description: "Create purchase plans.",
+  },
+  {
+    key: "supply_chain.plan.approve",
+    domain: "supply_chain",
+    verb: "approve",
+    description: "Approve purchase plans for conversion to purchase requests.",
+  },
+  {
+    key: "supply_chain.calendar.view",
+    domain: "supply_chain",
+    verb: "view",
+    description: "View the procurement calendar with deliveries, payments and contract expiries.",
+  },
+  {
+    key: "supply_chain.anomaly.view",
+    domain: "supply_chain",
+    verb: "view",
+    description: "View cost anomalies and procurement risk alerts.",
+  },
+
+  // --------------------------------------------------------------- experience
+  // Prompt #29's guest experience layer: feedback, complaints, service recovery,
+  // review management, and experience analytics. Extends CRM entities with an
+  // operational overlay for closed-loop guest experience management.
+  {
+    key: "experience.view",
+    domain: "experience",
+    verb: "view",
+    description: "Open the guest experience module.",
+  },
+  {
+    key: "experience.feedback.view",
+    domain: "experience",
+    verb: "feedback.view",
+    description: "See guest feedback records and responses.",
+  },
+  {
+    key: "experience.feedback.create",
+    domain: "experience",
+    verb: "feedback.create",
+    description: "Record new guest feedback.",
+  },
+  {
+    key: "experience.feedback.edit",
+    domain: "experience",
+    verb: "feedback.edit",
+    description: "Edit feedback records and update their status.",
+  },
+  {
+    key: "experience.feedback.manage",
+    domain: "experience",
+    verb: "feedback.manage",
+    description: "Manage feedback lifecycle including resolution and closure.",
+  },
+  {
+    key: "experience.complaint.view",
+    domain: "experience",
+    verb: "complaint.view",
+    description: "See guest complaints and their current status.",
+  },
+  {
+    key: "experience.complaint.create",
+    domain: "experience",
+    verb: "complaint.create",
+    description: "Log a new guest complaint.",
+  },
+  {
+    key: "experience.complaint.assign",
+    domain: "experience",
+    verb: "complaint.assign",
+    description: "Assign complaints to team members or departments.",
+  },
+  {
+    key: "experience.complaint.manage",
+    domain: "experience",
+    verb: "complaint.manage",
+    description: "Manage complaint lifecycle and status transitions.",
+  },
+  {
+    key: "experience.complaint.resolve",
+    domain: "experience",
+    verb: "complaint.resolve",
+    description: "Mark complaints as resolved with resolution details.",
+  },
+  {
+    key: "experience.complaint.close",
+    domain: "experience",
+    verb: "complaint.close",
+    description: "Close resolved complaints after follow-up.",
+  },
+  {
+    key: "experience.recovery.view",
+    domain: "experience",
+    verb: "recovery.view",
+    description: "See service recovery actions and their status.",
+  },
+  {
+    key: "experience.recovery.create",
+    domain: "experience",
+    verb: "recovery.create",
+    description: "Propose service recovery actions for guest issues.",
+  },
+  {
+    key: "experience.recovery.approve",
+    domain: "experience",
+    verb: "recovery.approve",
+    description: "Approve proposed service recovery actions.",
+  },
+  {
+    key: "experience.recovery.execute",
+    domain: "experience",
+    verb: "recovery.execute",
+    description: "Execute approved service recovery actions.",
+  },
+  {
+    key: "experience.analytics.view",
+    domain: "experience",
+    verb: "analytics.view",
+    description: "See experience analytics dashboards and KPIs.",
+  },
+  {
+    key: "experience.review.view",
+    domain: "experience",
+    verb: "review.view",
+    description: "See review requests and responses.",
+  },
+  {
+    key: "experience.review.manage",
+    domain: "experience",
+    verb: "review.manage",
+    description: "Manage review request lifecycle.",
+  },
+  {
+    key: "experience.review.approve",
+    domain: "experience",
+    verb: "review.approve",
+    description: "Approve guest reviews for publication.",
+  },
+  {
+    key: "experience.review.publish",
+    domain: "experience",
+    verb: "review.publish",
+    description: "Publish approved guest reviews.",
+  },
+  // ─── Marketing, campaigns & customer engagement (Prompt #30) ─────────
+  {
+    key: "marketing.view",
+    domain: "marketing",
+    verb: "view",
+    description: "See the marketing dashboard and module overview.",
+  },
+  {
+    key: "marketing.audience.view",
+    domain: "marketing",
+    verb: "audience.view",
+    description: "View marketing audiences and segment definitions.",
+  },
+  {
+    key: "marketing.audience.create",
+    domain: "marketing",
+    verb: "audience.create",
+    description: "Create new marketing audiences and conditions.",
+  },
+  {
+    key: "marketing.audience.edit",
+    domain: "marketing",
+    verb: "audience.edit",
+    description: "Edit audience definitions and conditions.",
+  },
+  {
+    key: "marketing.audience.delete",
+    domain: "marketing",
+    verb: "audience.delete",
+    description: "Delete marketing audiences.",
+  },
+  {
+    key: "marketing.campaign.view",
+    domain: "marketing",
+    verb: "campaign.view",
+    description: "View marketing campaigns and their details.",
+  },
+  {
+    key: "marketing.campaign.create",
+    domain: "marketing",
+    verb: "campaign.create",
+    description: "Create new marketing campaigns.",
+  },
+  {
+    key: "marketing.campaign.edit",
+    domain: "marketing",
+    verb: "campaign.edit",
+    description: "Edit draft or paused campaigns.",
+  },
+  {
+    key: "marketing.campaign.delete",
+    domain: "marketing",
+    verb: "campaign.delete",
+    description: "Delete draft campaigns.",
+  },
+  {
+    key: "marketing.campaign.launch",
+    domain: "marketing",
+    verb: "campaign.launch",
+    description: "Launch or activate marketing campaigns.",
+  },
+  {
+    key: "marketing.campaign.approve",
+    domain: "marketing",
+    verb: "campaign.approve",
+    description: "Approve campaigns pending review before launch.",
+  },
+  {
+    key: "marketing.offer.view",
+    domain: "marketing",
+    verb: "offer.view",
+    description: "View marketing offers and promo codes.",
+  },
+  {
+    key: "marketing.offer.create",
+    domain: "marketing",
+    verb: "offer.create",
+    description: "Create new offers and promotion codes.",
+  },
+  {
+    key: "marketing.offer.edit",
+    domain: "marketing",
+    verb: "offer.edit",
+    description: "Edit active or draft offers.",
+  },
+  {
+    key: "marketing.message.view",
+    domain: "marketing",
+    verb: "message.view",
+    description: "View campaign messages and delivery records.",
+  },
+  {
+    key: "marketing.message.send",
+    domain: "marketing",
+    verb: "message.send",
+    description: "Send or schedule campaign messages.",
+  },
+  {
+    key: "marketing.analytics.view",
+    domain: "marketing",
+    verb: "analytics.view",
+    description: "See marketing performance analytics and KPIs.",
+  },
+  {
+    key: "marketing.automation.view",
+    domain: "marketing",
+    verb: "automation.view",
+    description: "View marketing automation journeys and rules.",
+  },
+  {
+    key: "marketing.automation.create",
+    domain: "marketing",
+    verb: "automation.create",
+    description: "Create new marketing automation journeys.",
+  },
+  {
+    key: "marketing.automation.edit",
+    domain: "marketing",
+    verb: "automation.edit",
+    description: "Edit automation journey steps and triggers.",
+  },
+  {
+    key: "marketing.consent.view",
+    domain: "marketing",
+    verb: "consent.view",
+    description: "View customer marketing consent records.",
+  },
+  {
+    key: "marketing.consent.edit",
+    domain: "marketing",
+    verb: "consent.edit",
+    description: "Update customer marketing consent preferences.",
+  },
+  {
+    key: "marketing.review.approve",
+    domain: "marketing",
+    verb: "review.approve",
+    description: "Approve marketing content for publication.",
+  },
+  {
+    key: "marketing.settings.manage",
+    domain: "marketing",
+    verb: "settings.manage",
+    description: "Manage marketing module settings and frequency policies.",
+  },
+  // ── Guest Experience (Prompt #31) ──────────────────────────────────────
+  {
+    key: "guest_experience.view",
+    domain: "guest_experience",
+    verb: "view",
+    description: "View the guest experience hub and portal overview.",
+  },
+  {
+    key: "guest_experience.request.view",
+    domain: "guest_experience",
+    verb: "request.view",
+    description: "View guest service requests and their status.",
+  },
+  {
+    key: "guest_experience.request.create",
+    domain: "guest_experience",
+    verb: "request.create",
+    description: "Create new guest service requests on behalf of guests.",
+  },
+  {
+    key: "guest_experience.request.manage",
+    domain: "guest_experience",
+    verb: "request.manage",
+    description: "Acknowledge, assign, and complete guest service requests.",
+  },
+  {
+    key: "guest_experience.checkin.view",
+    domain: "guest_experience",
+    verb: "checkin.view",
+    description: "View digital pre-check-in records and guest details.",
+  },
+  {
+    key: "guest_experience.checkin.manage",
+    domain: "guest_experience",
+    verb: "checkin.manage",
+    description: "Process and complete digital pre-check-in submissions.",
+  },
+  {
+    key: "guest_experience.document.view",
+    domain: "guest_experience",
+    verb: "document.view",
+    description: "View guest identity documents and verification status.",
+  },
+  {
+    key: "guest_experience.document.manage",
+    domain: "guest_experience",
+    verb: "document.manage",
+    description: "Verify or reject guest identity documents.",
+  },
+  {
+    key: "guest_experience.conversation.view",
+    domain: "guest_experience",
+    verb: "conversation.view",
+    description: "View guest conversations and AI concierge chats.",
+  },
+  {
+    key: "guest_experience.conversation.manage",
+    domain: "guest_experience",
+    verb: "conversation.manage",
+    description: "Respond to guest conversations and perform human handoff.",
+  },
+  {
+    key: "guest_experience.analytics.view",
+    domain: "guest_experience",
+    verb: "analytics.view",
+    description: "View guest experience KPIs and digital engagement metrics.",
   },
 ];
 

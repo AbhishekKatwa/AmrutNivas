@@ -1009,8 +1009,8 @@ create or replace function public.assign_maintenance_request(
   p_organization       uuid,
   p_property           uuid,
   p_assigned_to        uuid,
-  p_assigned_vendor_id uuid default null,
-  p_expected_version   integer
+  p_expected_version   integer,
+  p_assigned_vendor_id uuid default null
 )
 returns jsonb
 language plpgsql
@@ -1105,8 +1105,8 @@ create or replace function public.resolve_maintenance_request(
   p_organization       uuid,
   p_property           uuid,
   p_resolution         text,
-  p_actual_cost        numeric default null,
-  p_expected_version   integer
+  p_expected_version   integer,
+  p_actual_cost        numeric default null
 )
 returns jsonb
 language plpgsql
@@ -1155,8 +1155,8 @@ create or replace function public.verify_maintenance_request(
   p_request            uuid,
   p_organization       uuid,
   p_property           uuid,
-  p_verification_notes text default null,
-  p_expected_version   integer
+  p_expected_version   integer,
+  p_verification_notes text default null
 )
 returns jsonb
 language plpgsql
@@ -1260,8 +1260,8 @@ create or replace function public.cancel_maintenance_request(
   p_request            uuid,
   p_organization       uuid,
   p_property           uuid,
-  p_reason             text default null,
-  p_expected_version   integer
+  p_expected_version   integer,
+  p_reason             text default null
 )
 returns void
 language plpgsql

@@ -93,6 +93,64 @@ import NotificationPreferences from "@/pages/notifications/NotificationPreferenc
 import CommunicationHistory from "@/pages/notifications/CommunicationHistory";
 import AutomationsPage from "@/pages/notifications/AutomationsPage";
 import IntegrationSettingsPage from "@/pages/integrations/IntegrationSettingsPage";
+import PlatformDashboardPage from "@/pages/platform/PlatformDashboardPage";
+import PlatformOrganizationsPage from "@/pages/platform/PlatformOrganizationsPage";
+import PlatformSupportPage from "@/pages/platform/PlatformSupportPage";
+import PlatformSecurityPage from "@/pages/platform/PlatformSecurityPage";
+import PlatformHealthPage from "@/pages/platform/PlatformHealthPage";
+import PlatformAnnouncementsPage from "@/pages/platform/PlatformAnnouncementsPage";
+import PlatformSettingsPage from "@/pages/platform/PlatformSettingsPage";
+import PlatformOnboardingPage from "@/pages/platform/PlatformOnboardingPage";
+import SetupWizard from "@/pages/setup/SetupWizard";
+import DocumentCenterPage from "@/pages/documents/DocumentCenterPage";
+import DocumentTemplatesPage from "@/pages/documents/DocumentTemplatesPage";
+import SettingsPage from "@/pages/settings/SettingsPage";
+import OperationsTaskBoard from "@/pages/workflow/OperationsTaskBoard";
+import MyWorkPage from "@/pages/workflow/MyWorkPage";
+import ApprovalCenterPage from "@/pages/workflow/ApprovalCenterPage";
+import RevenueDashboard from "@/pages/revenue/RevenueDashboard";
+import PromotionsPage from "@/pages/revenue/PromotionsPage";
+import PriceHistoryPage from "@/pages/revenue/PriceHistoryPage";
+import RateCalendar from "@/pages/revenue/RateCalendar";
+import ProcurementDashboard from "@/pages/procurement/ProcurementDashboard";
+import Supplier360Page from "@/pages/procurement/Supplier360Page";
+import ProcurementIntelligencePage from "@/pages/procurement/ProcurementIntelligencePage";
+import ProcurementCalendarPage from "@/pages/procurement/ProcurementCalendarPage";
+import ExperienceDashboard from "@/pages/experience/ExperienceDashboard";
+import ExperienceFeedbackPage from "@/pages/experience/ExperienceFeedbackPage";
+import ExperienceComplaintsPage from "@/pages/experience/ExperienceComplaintsPage";
+import ExperienceAnalyticsPage from "@/pages/experience/ExperienceAnalyticsPage";
+import HotelExperiencePage from "@/pages/experience/HotelExperiencePage";
+import RestaurantExperiencePage from "@/pages/experience/RestaurantExperiencePage";
+import EventExperiencePage from "@/pages/experience/EventExperiencePage";
+import ServiceQualityPage from "@/pages/experience/ServiceQualityPage";
+import ExperienceDetailPage from "@/pages/experience/ExperienceDetailPage";
+import ComplaintDetailPage from "@/pages/experience/ComplaintDetailPage";
+import FeedbackDetailPage from "@/pages/experience/FeedbackDetailPage";
+import PublicFeedbackPage from "@/pages/experience/PublicFeedbackPage";
+import MarketingDashboard from "@/pages/marketing/MarketingDashboard";
+import CampaignListPage from "@/pages/marketing/CampaignListPage";
+import CampaignDetailPage from "@/pages/marketing/CampaignDetailPage";
+import AudienceListPage from "@/pages/marketing/AudienceListPage";
+import OfferListPage from "@/pages/marketing/OfferListPage";
+import OfferDetailPage from "@/pages/marketing/OfferDetailPage";
+import MarketingAnalyticsPage from "@/pages/marketing/MarketingAnalyticsPage";
+import MarketingSettingsPage from "@/pages/marketing/MarketingSettingsPage";
+import GuestExperienceDashboard from "@/pages/guest-experience/GuestExperienceDashboard";
+import GuestBookingsPage from "@/pages/guest-experience/GuestBookingsPage";
+import GuestStayPage from "@/pages/guest-experience/GuestStayPage";
+import GuestDiningPage from "@/pages/guest-experience/GuestDiningPage";
+import GuestRequestsPage from "@/pages/guest-experience/GuestRequestsPage";
+import GuestBillsPage from "@/pages/guest-experience/GuestBillsPage";
+import GuestRewardsPage from "@/pages/guest-experience/GuestRewardsPage";
+import GuestOffersPage from "@/pages/guest-experience/GuestOffersPage";
+import GuestEventsPage from "@/pages/guest-experience/GuestEventsPage";
+import GuestFeedbackPage from "@/pages/guest-experience/GuestFeedbackPage";
+import GuestProfilePage from "@/pages/guest-experience/GuestProfilePage";
+import GuestCheckInPage from "@/pages/guest-experience/GuestCheckInPage";
+import GuestConciergePage from "@/pages/guest-experience/GuestConciergePage";
+import GuestNotificationsPage from "@/pages/guest-experience/GuestNotificationsPage";
+import GuestTimelinePage from "@/pages/guest-experience/GuestTimelinePage";
 import { lazy } from "react";
 
 const OwnerCommandCenter = lazy(() => import("@/pages/analytics/OwnerCommandCenter"));
@@ -214,6 +272,78 @@ export const ROUTES: readonly AppRoute[] = [
   { path: "/analytics/commerce", component: CommerceAnalyticsPage, permission: "analytics.commerce.view" },
   // AI Command Center (049) — natural-language business intelligence.
   { path: "/ai", component: AICommandCenter, permission: "analytics.dashboard.view" },
+  // Platform Admin (048) — internal platform operations layer.
+  { path: "/platform", component: PlatformDashboardPage, permission: "platform.dashboard.view" },
+  { path: "/platform/organizations", component: PlatformOrganizationsPage, permission: "platform.organization.view" },
+  { path: "/platform/support", component: PlatformSupportPage, permission: "platform.support.view" },
+  { path: "/platform/security", component: PlatformSecurityPage, permission: "platform.security.view" },
+  { path: "/platform/health", component: PlatformHealthPage, permission: "platform.health.view" },
+  { path: "/platform/announcements", component: PlatformAnnouncementsPage, permission: "platform.announcement.view" },
+  { path: "/platform/settings", component: PlatformSettingsPage, permission: "platform.feature_flag.view" },
+  // Onboarding & activation (Prompt #23) — enhanced setup wizard and platform onboarding dashboard.
+  { path: "/setup", component: SetupWizard },
+  { path: "/platform/onboarding", component: PlatformOnboardingPage, permission: "platform.organization.view" },
+  // Document management (Prompt #24) — unified document, template and generation layer.
+  { path: "/documents", component: DocumentCenterPage, permission: "documents.view" },
+  { path: "/documents/templates", component: DocumentTemplatesPage, permission: "documents.manage_templates" },
+  // Business Configuration (Prompt #25) — centralized settings, policies, and operational rules.
+  { path: "/settings", component: SettingsPage, permission: "settings.view" },
+  // Operational workflows, tasks & approvals (Prompt #26) — canonical task overlay,
+  // multi-step workflows, and the approval center.
+  { path: "/operations/tasks", component: OperationsTaskBoard, permission: "task.view" },
+  { path: "/my-work", component: MyWorkPage, permission: "task.view" },
+  { path: "/approvals", component: ApprovalCenterPage, permission: "approval.view" },
+  // Revenue management (Prompt #27) — pricing intelligence, rate plans, promotions, and yield optimization.
+  { path: "/revenue", component: RevenueDashboard, permission: "revenue.view" },
+  { path: "/revenue/promotions", component: PromotionsPage, permission: "revenue.promotion.view" },
+  { path: "/revenue/price-history", component: PriceHistoryPage, permission: "revenue.pricing.view" },
+  { path: "/hotel/revenue/rates", component: RateCalendar, permission: "revenue.pricing.view" },
+  // Supply chain & procurement (Prompt #28) — supplier intelligence, cost analytics, and procurement operations.
+  { path: "/procurement", component: ProcurementDashboard, permission: "supply_chain.view" },
+  { path: "/procurement/intelligence", component: ProcurementIntelligencePage, permission: "supply_chain.intelligence.view" },
+  { path: "/procurement/suppliers/:supplierId", component: Supplier360Page, permission: "supply_chain.supplier.view" },
+  { path: "/procurement/calendar", component: ProcurementCalendarPage, permission: "supply_chain.calendar.view" },
+  // Guest experience (Prompt #29) — feedback, complaints, service recovery, and experience analytics.
+  { path: "/experience", component: ExperienceDashboard, permission: "experience.view" },
+  { path: "/experience/feedback", component: ExperienceFeedbackPage, permission: "experience.feedback.view" },
+  { path: "/experience/complaints", component: ExperienceComplaintsPage, permission: "experience.complaint.view" },
+  { path: "/experience/analytics", component: ExperienceAnalyticsPage, permission: "experience.analytics.view" },
+  { path: "/experience/hotel", component: HotelExperiencePage, permission: "experience.view" },
+  { path: "/experience/restaurant", component: RestaurantExperiencePage, permission: "experience.view" },
+  { path: "/experience/events", component: EventExperiencePage, permission: "experience.view" },
+  { path: "/experience/service-quality", component: ServiceQualityPage, permission: "experience.analytics.view" },
+  { path: "/experience/:id", component: ExperienceDetailPage, permission: "experience.view" },
+  { path: "/experience/complaints/:id", component: ComplaintDetailPage, permission: "experience.complaint.view" },
+  { path: "/experience/feedback/:id", component: FeedbackDetailPage, permission: "experience.feedback.view" },
+  // Marketing, campaigns & customer engagement (Prompt #30) — campaign lifecycle,
+  // audiences, offers, attribution, analytics, and consent management.
+  { path: "/marketing", component: MarketingDashboard, permission: "marketing.view" },
+  { path: "/marketing/campaigns", component: CampaignListPage, permission: "marketing.campaign.view" },
+  { path: "/marketing/campaigns/new", component: CampaignDetailPage, permission: "marketing.campaign.create" },
+  { path: "/marketing/campaigns/:campaignId", component: CampaignDetailPage, permission: "marketing.campaign.view" },
+  { path: "/marketing/audiences", component: AudienceListPage, permission: "marketing.audience.view" },
+  { path: "/marketing/offers", component: OfferListPage, permission: "marketing.offer.view" },
+  { path: "/marketing/offers/new", component: OfferDetailPage, permission: "marketing.offer.create" },
+  { path: "/marketing/offers/:offerId", component: OfferDetailPage, permission: "marketing.offer.view" },
+  { path: "/marketing/analytics", component: MarketingAnalyticsPage, permission: "marketing.analytics.view" },
+  { path: "/marketing/settings", component: MarketingSettingsPage, permission: "marketing.settings.manage" },
+  // Digital guest journey, portal & hospitality experience hub (Prompt #31) —
+  // customer-facing experience layer overlaying PMS, restaurant, events, CRM, and loyalty.
+  { path: "/guest", component: GuestExperienceDashboard, permission: "guest_experience.view" },
+  { path: "/guest/bookings", component: GuestBookingsPage, permission: "guest_experience.view" },
+  { path: "/guest/stay", component: GuestStayPage, permission: "guest_experience.view" },
+  { path: "/guest/dining", component: GuestDiningPage, permission: "guest_experience.view" },
+  { path: "/guest/requests", component: GuestRequestsPage, permission: "guest_experience.request.view" },
+  { path: "/guest/bills", component: GuestBillsPage, permission: "guest_experience.view" },
+  { path: "/guest/rewards", component: GuestRewardsPage, permission: "guest_experience.view" },
+  { path: "/guest/offers", component: GuestOffersPage, permission: "guest_experience.view" },
+  { path: "/guest/events", component: GuestEventsPage, permission: "guest_experience.view" },
+  { path: "/guest/feedback", component: GuestFeedbackPage, permission: "guest_experience.view" },
+  { path: "/guest/profile", component: GuestProfilePage, permission: "guest_experience.view" },
+  { path: "/guest/checkin", component: GuestCheckInPage, permission: "guest_experience.checkin.view" },
+  { path: "/guest/concierge", component: GuestConciergePage, permission: "guest_experience.conversation.view" },
+  { path: "/guest/notifications", component: GuestNotificationsPage, permission: "guest_experience.view" },
+  { path: "/guest/timeline", component: GuestTimelinePage, permission: "guest_experience.view" },
 ];
 
 /**
@@ -227,6 +357,7 @@ export const PUBLIC_ROUTES: readonly AppRoute[] = [
   { path: "/menu/:outletSlug", component: PublicMenuPage },
   { path: "/order/:qrCode", component: PublicQROrderPage },
   { path: "/booking/lookup", component: PublicBookingLookupPage },
+  { path: "/feedback/:token", component: PublicFeedbackPage },
 ];
 
 /**

@@ -868,10 +868,10 @@ $$;
 -- Record a SaaS payment.
 create or replace function public.record_saas_payment(
   p_organization uuid,
-  p_invoice uuid default null,
-  p_subscription uuid default null,
   p_amount numeric,
   p_method text,
+  p_invoice uuid default null,
+  p_subscription uuid default null,
   p_transaction_ref text default null
 )
 returns jsonb

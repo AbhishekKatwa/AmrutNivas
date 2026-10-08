@@ -10,7 +10,6 @@ import { LifeBuoy, Search, Plus } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingBlock } from "@/components/ui/Spinner";
 import { can } from "@/domain/identity/types";
-import { toPublicError } from "@/lib/errors";
 import { useContextStore } from "@/state/context-store";
 import type { SupportCase, SupportCasePriority, SupportCaseStatus } from "@/domain/platform/types";
 

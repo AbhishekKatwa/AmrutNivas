@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   ShoppingBag,
+  User,
   Users,
   Wallet,
   X,
@@ -140,6 +141,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const signOut = useContextStore((state) => state.signOut);
+  const devEmail =
+    import.meta.env.DEV && sessionStorage.getItem("dev-bypass-auth") === "true"
+      ? sessionStorage.getItem("dev-bypass-email")
+      : null;
 
   // Navigating away always closes the drawer; otherwise a tap on a nav row would
   // leave the overlay sitting on top of the new page.
@@ -196,6 +201,12 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
           {/* The one place a person says which tenant they are working in. */}
           <ContextSwitcher />
+          {devEmail !== null && (
+            <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex" title={devEmail}>
+              <User className="size-3.5" aria-hidden />
+              <span className="max-w-[10rem] truncate">{devEmail}</span>
+            </span>
+          )}
           {/* §26: logout is the real path — GoTrue sign-out, then every piece of
               tenant state is dropped. It never navigates anywhere; the store's
               `unauthenticated` state renders the sign-in surface instead. */}

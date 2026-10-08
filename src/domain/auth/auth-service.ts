@@ -1,15 +1,14 @@
 /**
- * The one GoTrue adapter (Prompt #03 §25/§26/§41/§68).
+ * The one GoTrue adapter (Prompt #03 §25/§26/§41/§68, Prompt #31.5).
  *
- * The defect this prevents: two auth paths. This product has no passwords and §41
- * forbids inventing any — its whole entry path is the email sign-in link, the same
- * token-by-email model the invitations already use. Anything that wants to know,
- * start, observe or end a session comes through this file, so the GoTrue API
- * exists in exactly one place and the second path has nowhere to grow.
+ * Primary authentication is User ID + Password. The user types a `user_id`
+ * (e.g. AMRUT001); the adapter resolves it to a synthetic email the underlying
+ * Supabase Auth project understands, then delegates the password check to
+ * GoTrue's native `signInWithPassword`. No password ever travels further than
+ * GoTrue's own storage (§68).
  *
- * §68 is binding here: no session object, token or credential travels further
- * than GoTrue's own storage. The audit door is fed event names and outcomes only —
- * never an email address, never a token, never anything a log could leak.
+ * Anything that wants to know, start, observe or end a session comes through
+ * this file, so the GoTrue API exists in exactly one place.
  */
 
 import type { Session } from "@supabase/supabase-js";
@@ -68,37 +67,76 @@ function identityOf(session: Session | null): SessionIdentity | null {
 }
 
 /**
- * Send the sign-in link. This is the only credential-adjacent request the app
- * makes, and it asks for an address and nothing else. The failure copy is one line
- * for every GoTrue refusal on purpose (§41): parsing the message would let the
- * sign-in screen confirm which addresses have accounts.
+ * Sign in with User ID + Password (Prompt #31.5).
+ *
+ * The user supplies a `user_id` (e.g. AMRUT001). We resolve it to the synthetic
+ * email GoTrue knows, then delegate the password check to `signInWithPassword`.
+ * The failure message is always generic (§18): parsing GoTrue's error would let
+ * the login screen confirm which user IDs exist.
+ *
+ * On success, stamps `last_login_at` (fire-and-forget — never blocks the session).
  */
-export async function sendSignInLink(email: string): Promise<void> {
+export async function signInWithPassword(userId: string, password: string): Promise<void> {
   const client = requireSupabase();
-  const redirect = emailRedirectTo();
-  const { error } = await client.auth.signInWithOtp({
-    email: email.trim(),
-    ...(redirect === null ? {} : { options: { emailRedirectTo: redirect } }),
-  });
-  if (error === null) return;
+  const trimmedId = userId.trim();
+  if (trimmedId.length === 0 || password.length === 0) {
+    throw new AppError("VALIDATION_FAILED", "Invalid User ID or password.");
+  }
 
-  const rateLimited =
-    error.status === 429 || error.code === "over_email_send_rate_limit";
-  throw new AppError(
-    rateLimited ? "RATE_LIMITED" : "VALIDATION_FAILED",
-    rateLimited
-      ? "Too many sign-in requests. Please wait a minute and try again."
-      : "We could not send the sign-in link. Check the email address and try again.",
-    { cause: error },
-  );
+  const { data: resolved, error: resolveError } = await client.rpc("resolve_login", {
+    p_user_id: trimmedId,
+  });
+
+  if (resolveError !== null || resolved === null || (Array.isArray(resolved) && resolved.length === 0)) {
+    throw new AppError("AUTH_REQUIRED", "Invalid User ID or password.");
+  }
+
+  const row = Array.isArray(resolved) ? resolved[0] : resolved;
+  if (row.status !== "ACTIVE") {
+    throw new AppError("AUTH_REQUIRED", "Invalid User ID or password.");
+  }
+
+  const syntheticEmail = row.email as string;
+  const { error: signInError } = await client.auth.signInWithPassword({
+    email: syntheticEmail,
+    password,
+  });
+
+  if (signInError !== null) {
+    const rateLimited = signInError.status === 429;
+    throw new AppError(
+      rateLimited ? "RATE_LIMITED" : "AUTH_REQUIRED",
+      rateLimited
+        ? "Too many login attempts. Please wait a minute and try again."
+        : "Invalid User ID or password.",
+      { cause: signInError },
+    );
+  }
+
+  // Stamp last_login_at — fire-and-forget, never blocks the session.
+  // Uses a direct RPC since touch_last_login is not in the door catalogue.
+  void client.rpc("touch_last_login");
 }
 
-function emailRedirectTo(): string | null {
-  // The link must come back to this app so `detectSessionInUrl` can consume it.
-  // The suite runs in Node with no window; there the GoTrue default origin is the
-  // honest fallback, and only a browser can be redirected anywhere.
-  if (typeof window === "undefined") return null;
-  return `${appUrl()}${SIGN_IN_PATH}`;
+/**
+ * Request a password reset. The user supplies their User ID; we resolve it to
+ * the underlying email and ask GoTrue to send a reset link. The response is
+ * always the same (§18): we never reveal whether the user ID exists.
+ */
+export async function requestPasswordReset(userId: string): Promise<void> {
+  const client = requireSupabase();
+  const trimmedId = userId.trim();
+  if (trimmedId.length === 0) return;
+
+  const { data: resolved } = await client.rpc("resolve_recovery_email", {
+    p_user_id: trimmedId,
+  });
+
+  const email = Array.isArray(resolved) ? resolved[0]?.email : resolved?.email;
+  if (typeof email !== "string" || email.length === 0) return;
+
+  const redirect = typeof window !== "undefined" ? `${appUrl()}${SIGN_IN_PATH}` : undefined;
+  await client.auth.resetPasswordForEmail(email, redirect ? { redirectTo: redirect } : undefined);
 }
 
 /**
@@ -162,4 +200,22 @@ function swallowAuditFailure(_error: unknown): void {
   // Deliberately silent: logging the failure is how a token-shaped error string
   // ends up in a console (§68). A missing audit row is the documented, accepted
   // cost of never letting an audit write deny somebody their sign-in or sign-out.
+}
+
+/**
+ * DEV ONLY: Complete bypass that skips Supabase auth entirely.
+ * Sets a flag in sessionStorage that the context store reads to bypass all auth.
+ * Only works in development mode.
+ */
+export async function devBypassSignIn(email: string): Promise<void> {
+  if (import.meta.env.DEV === false) {
+    throw new AppError("PERMISSION_DENIED", "Dev bypass is only available in development mode.");
+  }
+
+  // Set flags that the context store will read on next bootstrap
+  sessionStorage.setItem("dev-bypass-auth", "true");
+  sessionStorage.setItem("dev-bypass-email", email.trim());
+
+  // Trigger a page reload so the context store re-bootstraps with the dev flag
+  window.location.reload();
 }

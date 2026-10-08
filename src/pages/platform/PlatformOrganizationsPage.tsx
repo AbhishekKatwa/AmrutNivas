@@ -10,7 +10,6 @@ import { Search, Building2, MoreVertical } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingBlock } from "@/components/ui/Spinner";
 import { can } from "@/domain/identity/types";
-import { toPublicError } from "@/lib/errors";
 import { useContextStore } from "@/state/context-store";
 
 type Organization = {

@@ -41,7 +41,7 @@ declare
     'hotel_payment.view', 'hotel_payment.create', 'hotel_payment.refund',
 
     -- Guests
-    'guest.view', 'guest.create', 'guest.edit', 'guest.sensitive.view',
+    'guest.view', 'guest.create', 'guest.edit', 'guest.view_sensitive',
 
     -- Availability
     'room_availability.view', 'room_availability.override',
@@ -50,7 +50,7 @@ declare
     'housekeeping_status.view', 'housekeeping_status.update'
   ];
 begin
-  perform app.require_valid(array_length(v_tokens, 1) = 46, 'NIVAAS_PERMISSION_SEED_BROKEN');
+  perform app.require_valid(array_length(v_tokens, 1) = 41, 'NIVAAS_PERMISSION_SEED_BROKEN');
   perform app.require_valid(
     not exists (select t from unnest(v_tokens) t
                  where t !~ E'^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$'),
@@ -75,7 +75,7 @@ delete from public.role_permissions rp
       'stay.view', 'stay.create', 'stay.modify',
       'folio.view', 'folio.charge', 'folio.adjust', 'folio.discount', 'folio.settle',
       'hotel_payment.view', 'hotel_payment.create', 'hotel_payment.refund',
-      'guest.view', 'guest.create', 'guest.edit', 'guest.sensitive.view',
+      'guest.view', 'guest.create', 'guest.edit', 'guest.view_sensitive',
       'room_availability.view', 'room_availability.override',
       'housekeeping_status.view', 'housekeeping_status.update'
     );
@@ -100,7 +100,7 @@ with role_permission_matrix(role_name, permission) as (
     ('ORG_OWNER', 'hotel_payment.view'), ('ORG_OWNER', 'hotel_payment.create'),
     ('ORG_OWNER', 'hotel_payment.refund'),
     ('ORG_OWNER', 'guest.view'), ('ORG_OWNER', 'guest.create'),
-    ('ORG_OWNER', 'guest.edit'), ('ORG_OWNER', 'guest.sensitive.view'),
+    ('ORG_OWNER', 'guest.edit'), ('ORG_OWNER', 'guest.view_sensitive'),
     ('ORG_OWNER', 'room_availability.view'), ('ORG_OWNER', 'room_availability.override'),
     ('ORG_OWNER', 'housekeeping_status.view'), ('ORG_OWNER', 'housekeeping_status.update'),
 
@@ -122,7 +122,7 @@ with role_permission_matrix(role_name, permission) as (
     ('ORG_ADMIN', 'hotel_payment.view'), ('ORG_ADMIN', 'hotel_payment.create'),
     ('ORG_ADMIN', 'hotel_payment.refund'),
     ('ORG_ADMIN', 'guest.view'), ('ORG_ADMIN', 'guest.create'),
-    ('ORG_ADMIN', 'guest.edit'), ('ORG_ADMIN', 'guest.sensitive.view'),
+    ('ORG_ADMIN', 'guest.edit'), ('ORG_ADMIN', 'guest.view_sensitive'),
     ('ORG_ADMIN', 'room_availability.view'), ('ORG_ADMIN', 'room_availability.override'),
     ('ORG_ADMIN', 'housekeeping_status.view'), ('ORG_ADMIN', 'housekeeping_status.update'),
 
@@ -213,13 +213,13 @@ begin
     'stay.view', 'stay.create', 'stay.modify',
     'folio.view', 'folio.charge', 'folio.adjust', 'folio.discount', 'folio.settle',
     'hotel_payment.view', 'hotel_payment.create', 'hotel_payment.refund',
-    'guest.view', 'guest.create', 'guest.edit', 'guest.sensitive.view',
+    'guest.view', 'guest.create', 'guest.edit', 'guest.view_sensitive',
     'room_availability.view', 'room_availability.override',
     'housekeeping_status.view', 'housekeeping_status.update'
   );
-  -- ORG_OWNER=46, ORG_ADMIN=46, GENERAL_MANAGER=37, PROPERTY_MANAGER=35,
-  -- RESTAURANT_MANAGER=6, STORE_MANAGER=4, STAFF=4 → 178 total
-  perform app.require_valid(v_count = 178,
-    'NIVAAS_PERMISSION_COUNT: expected 178 hotel grants, got ' || v_count);
+  -- ORG_OWNER=41, ORG_ADMIN=41, GENERAL_MANAGER=36, PROPERTY_MANAGER=35,
+  -- RESTAURANT_MANAGER=6, STORE_MANAGER=4, STAFF=4 → 167 total
+  perform app.require_valid(v_count = 167,
+    'NIVAAS_PERMISSION_COUNT: expected 167 hotel grants, got ' || v_count);
 end;
 $$;

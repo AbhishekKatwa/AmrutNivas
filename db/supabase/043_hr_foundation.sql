@@ -810,8 +810,8 @@ CREATE OR REPLACE FUNCTION app.request_shift_swap(
   p_requester_id uuid,
   p_responder_id uuid,
   p_requester_shift_id uuid,
-  p_responder_shift_id uuid DEFAULT NULL,
   p_swap_date date,
+  p_responder_shift_id uuid DEFAULT NULL,
   p_reason text DEFAULT NULL
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE

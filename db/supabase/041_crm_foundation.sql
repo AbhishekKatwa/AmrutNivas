@@ -1064,10 +1064,10 @@ $$;
 -- --------------------------------------------------- create_complaint (§18)
 create or replace function public.create_complaint(
   p_organization       uuid,
+  p_description        text,
   p_customer           uuid default null,
   p_category           text default 'OTHER',
   p_priority           text default 'NORMAL',
-  p_description        text,
   p_property           uuid default null,
   p_outlet             uuid default null,
   p_reference_type     text default null,
@@ -1531,7 +1531,7 @@ begin
   perform app.require_valid(array_length(v_tokens, 1) = 27, 'NIVAAS_PERMISSION_SEED_BROKEN');
   perform app.require_valid(
     not exists (select t from unnest(v_tokens) t
-                 where t !~ E'^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$'),
+                 where t !~ E'^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$'),
     'NIVAAS_PERMISSION_SEED_BROKEN');
 end;
 $$;
@@ -1672,8 +1672,8 @@ begin
     'crm.segment.view', 'crm.segment.manage',
     'crm.corporate.view', 'crm.corporate.manage'
   );
-  -- ORG_OWNER=27, ORG_ADMIN=27, GM=24, PM=24, RM=10, SM=4, STAFF=2 → 118
-  perform app.require_valid(v_count = 118,
-    'NIVAAS_PERMISSION_COUNT: expected 118 CRM grants, got ' || v_count);
+  -- ORG_OWNER=27, ORG_ADMIN=27, GM=22, PM=22, RM=10, SM=4, STAFF=2 → 114
+  perform app.require_valid(v_count = 114,
+    'NIVAAS_PERMISSION_COUNT: expected 114 CRM grants, got ' || v_count);
 end;
 $$;

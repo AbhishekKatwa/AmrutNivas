@@ -364,6 +364,15 @@ export default function OrganizationPage() {
 
   const reload = useCallback(async (): Promise<void> => {
     if (organizationId === null) return;
+    // DEV MODE: skip Supabase fetch when using the auth bypass
+    if (import.meta.env.DEV && sessionStorage.getItem("dev-bypass-auth") === "true") {
+      if (claimed !== null && claimed.id === organizationId) {
+        setOrganization(claimed);
+        setLoadError(null);
+      }
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       // Archived stays opted in: restoring a retired tenant is a job this screen has.

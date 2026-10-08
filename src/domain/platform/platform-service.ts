@@ -29,6 +29,7 @@ import type {
   FeatureFlagTargetType,
   FeatureFlagEnvironment,
   PlatformDashboardMetrics,
+  PlatformConfiguration,
 } from "./types";
 
 // ============================================================================
@@ -46,7 +47,7 @@ export async function listPlatformRoles(): Promise<PlatformRole[]> {
 /**
  * Get platform role by ID.
  */
-export async function getPlatformRole(roleId: EntityId): Promise<PlatformRole | null> {
+export async function getPlatformRole(_roleId: EntityId): Promise<PlatformRole | null> {
   // TODO: Fetch from database
   return null;
 }
@@ -54,7 +55,7 @@ export async function getPlatformRole(roleId: EntityId): Promise<PlatformRole | 
 /**
  * Get platform role by code.
  */
-export async function getPlatformRoleByCode(code: string): Promise<PlatformRole | null> {
+export async function getPlatformRoleByCode(_code: string): Promise<PlatformRole | null> {
   // TODO: Fetch from database
   return null;
 }
@@ -62,7 +63,7 @@ export async function getPlatformRoleByCode(code: string): Promise<PlatformRole 
 /**
  * Assign platform role to user.
  */
-export async function assignPlatformRole(params: {
+export async function assignPlatformRole(_params: {
   userId: EntityId;
   platformRoleId: EntityId;
   grantedBy: EntityId;
@@ -74,7 +75,7 @@ export async function assignPlatformRole(params: {
 /**
  * Revoke platform role from user.
  */
-export async function revokePlatformRole(params: {
+export async function revokePlatformRole(_params: {
   userId: EntityId;
   platformRoleId: EntityId;
 }): Promise<void> {
@@ -85,7 +86,7 @@ export async function revokePlatformRole(params: {
 /**
  * Get user's platform roles.
  */
-export async function getUserPlatformRoles(userId: EntityId): Promise<PlatformRole[]> {
+export async function getUserPlatformRoles(_userId: EntityId): Promise<PlatformRole[]> {
   // TODO: Fetch from database
   return [];
 }
@@ -94,8 +95,8 @@ export async function getUserPlatformRoles(userId: EntityId): Promise<PlatformRo
  * Check if user has platform permission.
  */
 export async function hasPlatformPermission(
-  userId: EntityId,
-  permission: string
+  _userId: EntityId,
+  _permission: string
 ): Promise<boolean> {
   // TODO: Check platform_role_permissions
   return false;
@@ -145,7 +146,7 @@ export async function createSupportCase(params: {
 /**
  * Get support case by ID.
  */
-export async function getSupportCase(caseId: EntityId): Promise<SupportCase | null> {
+export async function getSupportCase(_caseId: EntityId): Promise<SupportCase | null> {
   // TODO: Fetch from database
   return null;
 }
@@ -153,7 +154,7 @@ export async function getSupportCase(caseId: EntityId): Promise<SupportCase | nu
 /**
  * List support cases with filters.
  */
-export async function listSupportCases(params: {
+export async function listSupportCases(_params: {
   organizationId?: EntityId | null;
   status?: SupportCaseStatus;
   priority?: SupportCasePriority;
@@ -168,8 +169,8 @@ export async function listSupportCases(params: {
  * Update support case.
  */
 export async function updateSupportCase(
-  caseId: EntityId,
-  updates: {
+  _caseId: EntityId,
+  _updates: {
     status?: SupportCaseStatus;
     priority?: SupportCasePriority;
     assignedTo?: EntityId | null;
@@ -207,7 +208,7 @@ export async function addSupportCaseNote(params: {
 /**
  * List notes for support case.
  */
-export async function listSupportCaseNotes(caseId: EntityId): Promise<SupportCaseNote[]> {
+export async function listSupportCaseNotes(_caseId: EntityId): Promise<SupportCaseNote[]> {
   // TODO: Fetch from database
   return [];
 }
@@ -256,7 +257,7 @@ export async function createSupportAccessSession(params: {
  * Get support access session.
  */
 export async function getSupportAccessSession(
-  sessionId: EntityId
+  _sessionId: EntityId
 ): Promise<SupportAccessSession | null> {
   // TODO: Fetch from database
   return null;
@@ -265,7 +266,7 @@ export async function getSupportAccessSession(
 /**
  * List active support access sessions.
  */
-export async function listActiveSupportAccessSessions(params: {
+export async function listActiveSupportAccessSessions(_params: {
   platformAdminId?: EntityId;
   organizationId?: EntityId;
 }): Promise<SupportAccessSession[]> {
@@ -276,7 +277,10 @@ export async function listActiveSupportAccessSessions(params: {
 /**
  * Revoke support access session.
  */
-export async function revokeSupportAccessSession(sessionId: EntityId): Promise<void> {
+export async function revokeSupportAccessSession(
+  _sessionId: EntityId,
+  _params: { sessionId: EntityId }
+): Promise<void> {
   // TODO: Update revoked_at timestamp
   // TODO: Audit event: SUPPORT_ACCESS_REVOKED
 }
@@ -284,7 +288,7 @@ export async function revokeSupportAccessSession(sessionId: EntityId): Promise<v
 /**
  * Check if support access is valid.
  */
-export async function isValidSupportAccess(params: {
+export async function isValidSupportAccess(_params: {
   platformAdminId: EntityId;
   organizationId: EntityId;
 }): Promise<boolean> {
@@ -333,7 +337,7 @@ export async function createSecurityIncident(params: {
  * Get security incident.
  */
 export async function getSecurityIncident(
-  incidentId: EntityId
+  _incidentId: EntityId
 ): Promise<SecurityIncident | null> {
   // TODO: Fetch from database
   return null;
@@ -342,7 +346,7 @@ export async function getSecurityIncident(
 /**
  * List security incidents.
  */
-export async function listSecurityIncidents(params: {
+export async function listSecurityIncidents(_params: {
   organizationId?: EntityId | null;
   status?: SecurityIncidentStatus;
   severity?: SecurityIncidentSeverity;
@@ -356,8 +360,8 @@ export async function listSecurityIncidents(params: {
  * Update security incident.
  */
 export async function updateSecurityIncident(
-  incidentId: EntityId,
-  updates: {
+  _incidentId: EntityId,
+  _updates: {
     status?: SecurityIncidentStatus;
     assignedTo?: EntityId | null;
     resolution?: string | null;
@@ -411,7 +415,7 @@ export async function createPlatformAnnouncement(params: {
  * Get platform announcement.
  */
 export async function getPlatformAnnouncement(
-  announcementId: EntityId
+  _announcementId: EntityId
 ): Promise<PlatformAnnouncement | null> {
   // TODO: Fetch from database
   return null;
@@ -428,7 +432,7 @@ export async function listActiveAnnouncements(): Promise<PlatformAnnouncement[]>
 /**
  * List all announcements (for platform admin).
  */
-export async function listAllAnnouncements(params: {
+export async function listAllAnnouncements(_params: {
   status?: AnnouncementStatus;
 }): Promise<PlatformAnnouncement[]> {
   // TODO: Fetch from database
@@ -439,8 +443,8 @@ export async function listAllAnnouncements(params: {
  * Update platform announcement.
  */
 export async function updatePlatformAnnouncement(
-  announcementId: EntityId,
-  updates: {
+  _announcementId: EntityId,
+  _updates: {
     status?: AnnouncementStatus;
     title?: string;
     message?: string;
@@ -490,7 +494,7 @@ export async function createFeatureFlag(params: {
 /**
  * Get feature flag by key.
  */
-export async function getFeatureFlagByKey(key: string): Promise<FeatureFlag | null> {
+export async function getFeatureFlagByKey(_key: string): Promise<FeatureFlag | null> {
   // TODO: Fetch from database
   return null;
 }
@@ -498,7 +502,7 @@ export async function getFeatureFlagByKey(key: string): Promise<FeatureFlag | nu
 /**
  * List all feature flags.
  */
-export async function listFeatureFlags(params: {
+export async function listFeatureFlags(_params: {
   environment?: FeatureFlagEnvironment;
   enabled?: boolean;
 }): Promise<FeatureFlag[]> {
@@ -510,8 +514,8 @@ export async function listFeatureFlags(params: {
  * Update feature flag.
  */
 export async function updateFeatureFlag(
-  flagId: EntityId,
-  updates: {
+  _flagId: EntityId,
+  _updates: {
     enabled?: boolean;
     name?: string;
     description?: string | null;
@@ -525,7 +529,7 @@ export async function updateFeatureFlag(
 /**
  * Check if feature is enabled for context.
  */
-export async function isFeatureEnabled(params: {
+export async function isFeatureEnabled(_params: {
   key: string;
   organizationId?: EntityId;
   propertyId?: EntityId;
@@ -562,15 +566,33 @@ export async function getPlatformDashboardMetrics(): Promise<PlatformDashboardMe
       arr: 0,
       arpa: 0,
     },
-    support: {
-      openCases: 0,
-      urgentCases: 0,
-      avgResolutionTime: null,
+    users: {
+      total: 0,
+      active: 0,
     },
-    security: {
-      openIncidents: 0,
-      criticalIncidents: 0,
-      failedLogins24h: 0,
+    properties: {
+      total: 0,
+    },
+    outlets: {
+      total: 0,
+    },
+    revenue: {
+      mrr: 0,
+      arr: 0,
+    },
+    supportCases: {
+      open: 0,
+      urgent: 0,
+    },
+    securityIncidents: {
+      open: 0,
+      critical: 0,
+    },
+    supportAccess: {
+      activeSessions: 0,
+    },
+    integrations: {
+      failed: 0,
     },
     health: {
       apiHealthy: true,
@@ -579,4 +601,16 @@ export async function getPlatformDashboardMetrics(): Promise<PlatformDashboardMe
       webhookFailures: 0,
     },
   };
+}
+
+// ============================================================================
+// Platform Configuration
+// ============================================================================
+
+/**
+ * List all platform configuration entries.
+ */
+export async function listPlatformConfigurations(): Promise<PlatformConfiguration[]> {
+  // TODO: Fetch from database
+  return [];
 }

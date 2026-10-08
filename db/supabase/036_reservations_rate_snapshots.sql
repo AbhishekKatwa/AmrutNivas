@@ -558,8 +558,8 @@ create or replace function public.create_reservation_rate_snapshot(
   p_property           uuid,
   p_rate_date          date,
   p_room_type          uuid,
-  p_rate_plan          uuid default null,
   p_room_rate          numeric,
+  p_rate_plan          uuid default null,
   p_tax_amount         numeric default 0,
   p_discount_amount    numeric default 0
 )
