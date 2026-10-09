@@ -39,7 +39,7 @@ export default function ProfitLossPage() {
       try {
         const sb = requireSupabase();
 
-        const [billsRes, foliosRes, eventsRes, expensesRes] = await Promise.all([
+        const [billsRes, foliosRes, eventPaymentsRes, expensesRes] = await Promise.all([
           sb
             .from("bills")
             .select("grand_total")
@@ -51,10 +51,9 @@ export default function ProfitLossPage() {
             .eq("organization_id", organizationId)
             .eq("status", "SETTLED"),
           sb
-            .from("events")
-            .select("total_amount")
-            .eq("organization_id", organizationId)
-            .eq("status", "COMPLETED"),
+            .from("event_payments")
+            .select("amount")
+            .eq("organization_id", organizationId),
           sb
             .from("supplier_payments")
             .select("total_amount")
@@ -62,9 +61,12 @@ export default function ProfitLossPage() {
             .eq("status", "POSTED"),
         ]);
 
+        const firstError = billsRes.error || foliosRes.error || eventPaymentsRes.error || expensesRes.error;
+        if (firstError) throw firstError;
+
         const restaurantIncome = billsRes.data?.reduce((s, b) => s + Number(b.grand_total || 0), 0) || 0;
         const hotelIncome = foliosRes.data?.reduce((s, f) => s + Number(f.total_charges || 0), 0) || 0;
-        const eventIncome = eventsRes.data?.reduce((s, e) => s + Number(e.total_amount || 0), 0) || 0;
+        const eventIncome = eventPaymentsRes.data?.reduce((s, e) => s + Number(e.amount || 0), 0) || 0;
         const totalExpenses = expensesRes.data?.reduce((s, p) => s + Number(p.total_amount || 0), 0) || 0;
 
         if (!ignore) {

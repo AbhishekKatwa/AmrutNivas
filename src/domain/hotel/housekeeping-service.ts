@@ -102,7 +102,7 @@ export async function createHousekeepingTask(
     p_organization: scope.organizationId,
     p_property: scope.propertyId,
     p_room: params.roomId,
-    p_stay: params.stayId ?? null,
+    p_stay_id: params.stayId ?? null,
     p_task_type: params.taskType,
     p_priority: params.priority ?? "NORMAL",
     p_notes: params.notes ?? null,

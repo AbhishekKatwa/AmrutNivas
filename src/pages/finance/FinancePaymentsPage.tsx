@@ -64,6 +64,9 @@ export default function FinancePaymentsPage() {
             .limit(50),
         ]);
 
+        const firstError = restRes.error || eventRes.error || supplierRes.error;
+        if (firstError) throw firstError;
+
         const incoming: Payment[] = [
           ...(restRes.data || []).map((p) => ({
             id: `pay-${p.id}`,

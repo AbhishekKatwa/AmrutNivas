@@ -45,25 +45,31 @@ export default function FinanceInvoicesPage() {
         const sb = requireSupabase();
 
         // Load restaurant bills as invoices
-        const { data: bills } = await sb
+        const billsRes = await sb
           .from("bills")
-          .select("id, bill_number, grand_total, status, business_date, table_name")
+          .select("id, bill_number, grand_total, status, business_date")
           .eq("organization_id", organizationId)
+          .neq("status", "CANCELLED")
           .order("business_date", { ascending: false })
           .limit(50);
+        if (billsRes.error) throw billsRes.error;
 
         // Load hotel folios as invoices
-        const { data: folios } = await sb
+        const foliosRes = await sb
           .from("folios")
-          .select("id, folio_number, total_charges, status, opened_at, guest_name")
+          .select("id, folio_number, total_charges, status, opened_at")
           .eq("organization_id", organizationId)
           .order("opened_at", { ascending: false })
           .limit(50);
+        if (foliosRes.error) throw foliosRes.error;
+
+        const bills = billsRes.data;
+        const folios = foliosRes.data;
 
         const billInvoices: Invoice[] = (bills || []).map((b) => ({
           id: `bill-${b.id}`,
           number: b.bill_number || `B-${b.id.slice(0, 8)}`,
-          customer: b.table_name || "Walk-in",
+          customer: "Walk-in",
           amount: Number(b.grand_total || 0),
           status: b.status === "PAID" ? "PAID" : "OUTSTANDING",
           date: b.business_date,
@@ -73,7 +79,7 @@ export default function FinanceInvoicesPage() {
         const folioInvoices: Invoice[] = (folios || []).map((f) => ({
           id: `folio-${f.id}`,
           number: f.folio_number || `F-${f.id.slice(0, 8)}`,
-          customer: f.guest_name || "Guest",
+          customer: "Guest",
           amount: Number(f.total_charges || 0),
           status: f.status === "SETTLED" ? "PAID" : "OUTSTANDING",
           date: f.opened_at,

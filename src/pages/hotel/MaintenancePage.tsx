@@ -158,7 +158,6 @@ type RequestDraft = {
   priority: MaintenancePriority;
   roomId: string;
   description: string;
-  estimatedCost: string;
   notes: string;
 };
 
@@ -169,7 +168,6 @@ function newRequestDraft(): RequestDraft {
     priority: "NORMAL",
     roomId: "",
     description: "",
-    estimatedCost: "",
     notes: "",
   };
 }
@@ -928,7 +926,6 @@ function CreateRequestSheet({
         priority: draft.priority,
         roomId: draft.roomId || null,
         description: draft.description.trim() || null,
-        estimatedCost: draft.estimatedCost.trim() ? Number(draft.estimatedCost.trim()) : null,
         notes: draft.notes.trim() || null,
       });
       onSaved();
@@ -1001,14 +998,6 @@ function CreateRequestSheet({
             onChange={(event) => setDraft((d) => ({ ...d, description: event.target.value }))}
             placeholder="Detailed description of the issue…"
             rows={3}
-          />
-        </Field>
-        <Field label="Estimated cost (optional)">
-          <TextInput
-            value={draft.estimatedCost}
-            onChange={(event) => setDraft((d) => ({ ...d, estimatedCost: event.target.value }))}
-            placeholder="0.00"
-            type="number"
           />
         </Field>
         <Field label="Notes (optional)">

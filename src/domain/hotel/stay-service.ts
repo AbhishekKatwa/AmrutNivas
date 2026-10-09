@@ -27,10 +27,10 @@ const STAY_COLUMNS =
   "created_at, updated_at, created_by";
 
 const STAY_GUEST_COLUMNS =
-  "id, organization_id, stay_id, guest_id, role, checked_in_at, checked_out_at, created_at";
+  "id, stay_id, guest_id, role, checked_in_at, checked_out_at, created_at";
 
 const STAY_ROOM_MOVE_COLUMNS =
-  "id, organization_id, stay_id, from_room_id, to_room_id, moved_at, reason, notes, moved_by";
+  "id, stay_id, from_room_id, to_room_id, moved_at, reason, moved_by";
 
 /* --------------------------------------------------------------------- scope */
 
@@ -98,7 +98,6 @@ export async function getStay(
 
 /** Get guests for a stay. */
 export async function getStayGuests(
-  scope: StayScope,
   stayId: EntityId,
 ): Promise<StayGuest[]> {
   const sb = requireSupabase();
@@ -108,7 +107,6 @@ export async function getStayGuests(
         .from(STAY_GUESTS)
         .select(STAY_GUEST_COLUMNS)
         .eq("stay_id", stayId)
-        .eq("organization_id", scope.organizationId)
         .order("created_at", { ascending: true }),
     ),
   );
@@ -116,7 +114,6 @@ export async function getStayGuests(
 
 /** Get room moves for a stay. */
 export async function getStayRoomMoves(
-  scope: StayScope,
   stayId: EntityId,
 ): Promise<StayRoomMove[]> {
   const sb = requireSupabase();
@@ -126,7 +123,6 @@ export async function getStayRoomMoves(
         .from(STAY_ROOM_MOVES)
         .select(STAY_ROOM_MOVE_COLUMNS)
         .eq("stay_id", stayId)
-        .eq("organization_id", scope.organizationId)
         .order("moved_at", { ascending: true }),
     ),
   );
@@ -139,12 +135,14 @@ export async function checkIn(
   scope: StayScope,
   reservationId: EntityId,
   roomId: EntityId,
+  expectedCheckOutAt: string,
 ): Promise<Stay> {
   return callDoorRow<Stay>("check_in", {
     p_reservation: reservationId,
     p_organization: scope.organizationId,
     p_property: scope.propertyId,
     p_room: roomId,
+    p_expected_check_out: expectedCheckOutAt,
   });
 }
 
@@ -165,12 +163,14 @@ export async function extendStay(
   scope: StayScope,
   stayId: EntityId,
   newCheckOutDate: string,
+  expectedVersion: number,
 ): Promise<Stay> {
   return callDoorRow<Stay>("extend_stay", {
     p_stay: stayId,
     p_organization: scope.organizationId,
     p_property: scope.propertyId,
     p_new_check_out: newCheckOutDate,
+    p_expected_version: expectedVersion,
   });
 }
 
@@ -180,15 +180,13 @@ export async function moveRoom(
   stayId: EntityId,
   toRoomId: EntityId,
   reason: RoomMoveReason,
-  notes?: string,
 ): Promise<Stay> {
   return callDoorRow<Stay>("move_room", {
     p_stay: stayId,
     p_organization: scope.organizationId,
     p_property: scope.propertyId,
-    p_to_room: toRoomId,
+    p_new_room: toRoomId,
     p_reason: reason,
-    p_notes: notes ?? null,
   });
 }
 

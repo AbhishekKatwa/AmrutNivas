@@ -255,6 +255,8 @@ records read back on-screen, doors exercised end-to-end.
 | UI-0032 | `toDoorArgs` double-`p_` mangling | P0 blocker | VERIFIED (2026-10-09) |
 | UI-0033 | PO approve — illegal DRAFT→APPROVED + hidden error | P1 major | VERIFIED (2026-10-09) |
 | UI-0034 | 031 doors — missing 3-arg `app.evaluate_access` | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0035 | Room types — `bed_configuration` explicit-null 23502 | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0036 | 48 hotel doors — `p_property` uuid in audit slot 6 → 42883 | P0 blocker | VERIFIED (2026-10-09) |
 
 ## UI-0019..0026 — small-batch retest proof
 
@@ -384,3 +386,398 @@ retest proves the paths, not the volume.
   `remote-apply.mjs`. A future `remote-apply apply` would re-attempt 050–054 —
   see `UI_DEMO_DATA_LOG.md`.
 - **Status**: VERIFIED (2026-10-09)
+
+## UI-0035
+
+- **Screen / Route**: `/hotel/room-types` — New room type dialog
+- **Severity**: P0 blocker
+- **Actual**: Create room type → "Something went wrong". The dialog binds
+  `bedConfiguration` to `null` when the field is left blank, and the service sent
+  that explicit `null` to `create_room_type`, whose `p_bed_configuration` has a
+  `'[]'::jsonb` **default** — an explicit null overrides the default and hits
+  `room_types.bed_configuration` (`jsonb NOT NULL`) → SQL 23502.
+- **Root cause**: client passes `?? null` where the door expects the parameter to
+  be *omitted* (or `[]`), not nulled.
+- **Fix**: `src/domain/hotel/room-service.ts` `createRoomType` sends
+  `params.bedConfiguration ?? []`.
+- **Retest**: EXEC / Executive Deluxe / 3 max / 2 base / 320 sq ft created from
+  the dialog; row renders "EXEC · 2–3 guests · 320 sq ft".
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0036
+
+- **Screen / Route**: all hotel doors (034–039) — every write with an audit call
+- **Severity**: P0 blocker
+- **Actual**: after the client fix, create still failed. Raw RPC probe exposed
+  `42883: function app.audit(unknown, unknown, uuid, unknown, jsonb, uuid, jsonb)
+  does not exist`: 48 hotel audit calls pass `p_property` (uuid) in **slot 6** of
+  the seven-argument row-image overload (054), whose slot 6 is `text reason`.
+- **Root cause**: 054 froze the seven-arg shape with slot 6 = text (028–030's
+  convention) and explicitly deferred the 041/hotel callers that pass a uuid
+  there. Adding a uuid-slot-6 overload is impossible: two overloads differing
+  only in that slot make every untyped `null` call in 028–033/041 ambiguous
+  (42725) — so the callers, not the funnel, must change.
+- **Fix**: migration `056_hotel_audit_calls.sql` re-creates the 47 distinct
+  affected doors (48 calls; 039 `check_out` supersedes 037's) verbatim except
+  slot 6 → `null`. Org is recovered from the row image by the 054 funnel; the
+  audit call already passed `p_property` as a named door param where the row
+  image carries `property_id`. Generated + byte-verified by `db/build_056.mjs` /
+  `db/verify_056.mjs` (47/47 OK); applied to hosted and ledger-recorded via
+  `db/harness/apply-056-only.mjs` (the shared ledger is missing 050–054, so a
+  plain `remote-apply` run would replay them — see UI_DEMO_DATA_LOG).
+- **Retest**: room type EXEC created end-to-end through the UI (door committed,
+  audit line included — the whole transaction would have rolled back otherwise).
+- **Scope note**: 041 CRM doors passing `v_row.property_id` in slot 6 (8 calls)
+  remain broken and stay on Phase D's defect list — same defect class, CRM
+  domain.
+- **Status**: VERIFIED (2026-10-09)
+
+---
+
+# PHASE B RETEST RECORDS (UI-0037..0051)
+
+Phase B covered the hotel PMS surfaces — guests, front desk (rooms, room types,
+reservations), stays, housekeeping, maintenance, lost & found and assets — all
+driven live in the browser as OWNER001 against the hosted Supabase project.
+Defects were found by exercising the real flows, fixed at code level, and every
+VERIFIED status below is backed by an on-screen readback and, for writes, a
+captured `rest/v1/rpc/*` entry from the browser network log. As in Phase A,
+§15 volume targets remain unmet (documented in `UI_DEMO_DATA_LOG.md`) — the
+pass proves the paths, not the volume.
+
+## Index
+
+| ID | Screen | Severity | Status |
+|---|---|---|---|
+| UI-0037 | Guests — create | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0038 | Housekeeping — create-task sheet | P3 cosmetic | VERIFIED (2026-10-09) |
+| UI-0039 | Housekeeping — create task RPC | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0040 | Front desk — room availability | P1 major | VERIFIED (2026-10-09) |
+| UI-0041 | Front desk + stay detail — permission gates | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0042 | Stays — check-in RPC | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0043 | Stays — move room RPC | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0044 | Stays — extend stay RPC | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0045 | Stay detail — routes | P1 major | VERIFIED (2026-10-09) |
+| UI-0046 | Stay detail — read layer | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0047 | Stay detail — EXTENDED gating | P1 major | VERIFIED (2026-10-09) |
+| UI-0048 | Maintenance — create request | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0049 | Maintenance — room select | P3 cosmetic | VERIFIED (2026-10-09) |
+| UI-0050 | Lost & found — Return action | P1 major | VERIFIED (2026-10-09) |
+| UI-0051 | SelectInput (shared) — disabled empty options | P1 major | VERIFIED (2026-10-09) |
+| UI-0052 | Finance read layer — phantom columns, swallowed errors, open-PO mislabel | P0 blocker | VERIFIED (2026-10-09) |
+| UI-0053 | Route guards — 62 permission keys never granted | P0 blocker | VERIFIED (2026-10-09) |
+
+## UI-0037
+
+- **Screen / Route**: `/hotel/guests` — New guest dialog · reservation guest panel
+- **Domain**: Hotel / guest foundation (033)
+- **Severity**: P0 blocker
+- **Actual**: Create guest → 404. Three client↔door mismatches: the service never
+  sent the required `p_guest_code`; it sent `p_dob` where the door declares
+  `p_date_of_birth`; and it sent `p_source ?? null`, whose explicit null overrides
+  the door's `'DIRECT'` default and lands NULL in a NOT NULL column (23502).
+- **Root cause**: guest service written against an invented signature, not 033's
+  `create_guest`.
+- **Files changed**: `src/domain/hotel/guest-service.ts`
+- **Fix**: mints `generateGuestCode()` (`GST-…`), renames the DOB arg, sends
+  `"DIRECT"` when no source is chosen.
+- **Retest**: guest Rahul Deshmukh created through the dialog
+  (`b5be2042-2548-4373-8575-15d9d8225c72`) and used for the WALK_IN reservation
+  2026-10-09 → 2026-10-11 (see demo log).
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0038
+
+- **Screen / Route**: `/hotel/housekeeping` — Create task sheet
+- **Domain**: Hotel / housekeeping (039)
+- **Severity**: P3 cosmetic
+- **Actual**: the Room select opened on a real room with no honest unselected
+  state.
+- **Fix**: `placeholder="Choose a room…"` on the Room select
+  (`HousekeepingPage.tsx` ~709).
+- **Retest**: the HK workflow below picks the room explicitly; the sheet renders
+  the placeholder on open.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0039
+
+- **Screen / Route**: `/hotel/housekeeping` — task creation
+- **Domain**: Hotel / housekeeping (039)
+- **Severity**: P0 blocker
+- **Actual**: `create_housekeeping_task [404]` — the client sent `p_stay`; the
+  door declares `p_stay_id`.
+- **Fix**: `src/domain/hotel/housekeeping-service.ts` realigned to the 039 door.
+- **Retest**: full HK workflow for Room 101 below: task created → started →
+  completed (room → VACANT_CLEAN) → verified (→ INSPECTED).
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0040
+
+- **Screen / Route**: `/hotel/front-desk`
+- **Domain**: Hotel / front office
+- **Severity**: P1 major
+- **Actual**: front desk showed "Available 0" / "No available rooms" for
+  RES-2026-00001 even though Room 101 had just passed the entire designed HK
+  lifecycle to ACTIVE + INSPECTED. The sellable filter counted only
+  `VACANT_CLEAN`, omitting `INSPECTED` — the terminal state of a verified
+  checkout clean. A verified room is sellable.
+- **Fix**: the three sellable-filter sites in `FrontDeskPage.tsx` (room stats
+  ~178–190, `availableRoomsForMove` ~203–210, arrival-row availability) now
+  accept `(VACANT_CLEAN || INSPECTED)` on operationalStatus ACTIVE.
+- **Retest**: "Available 1"; Room 101 offered in the arrival row; Check-in
+  clickable (completes via UI-0042).
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0041
+
+- **Screen / Route**: `/hotel/front-desk` + `/hotel/stays/…`
+- **Domain**: Hotel / permissions
+- **Severity**: P0 blocker
+- **Actual**: the Check-in button was missing from the arrival row despite a
+  room being available. Gates referenced phantom keys `stay.check_in` /
+  `stay.check_out` / `stay.edit` that exist in neither the client
+  PERMISSION_CATALOGUE nor any DB seed → false for every role, buttons never
+  rendered.
+- **Fix**: gates realigned to the keys the doors actually check —
+  `frontoffice.checkin`, `frontoffice.checkout`, `stay.modify`,
+  `frontoffice.room_move` — across four gate sites (`FrontDeskPage.tsx`
+  ~115–118, `StayDetailPage.tsx` move/checkout gates).
+- **Retest**: render-proven (button renders → UI-0042's 200 completes the
+  chain); Move/Check-out render on the EXTENDED stay via UI-0047.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0042
+
+- **Screen / Route**: `/hotel/front-desk` — Check-in
+- **Domain**: Hotel / stays (037)
+- **Severity**: P0 blocker
+- **Actual**: `check_in` rejected — the client sent 4 args; the 037 door
+  requires 5, `p_expected_check_out timestamptz` with no default.
+- **Fix**: `src/domain/hotel/stay-service.ts` sends `p_expected_check_out` from
+  the reservation's departure date.
+- **Retest**: check-in from the arrival row → `[200]`; stay `ff5ef366…` created,
+  Room 101 → OCCUPIED.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0043
+
+- **Screen / Route**: stay detail — Move room
+- **Domain**: Hotel / stays (037)
+- **Severity**: P0 blocker
+- **Actual**: `move_room` 404 — the client sent `p_to_room` + `p_notes`; the
+  door declares `p_new_room` + `p_reason` (CHECK:
+  GUEST_REQUEST|MAINTENANCE|UPGRADE|OPERATIONAL|OTHER) and takes no notes.
+- **Fix**: `stay-service.ts` realigned; the UI sends a reason choice.
+- **Retest**: move exercised on the EXTENDED stay → `[200]` (also proves
+  UI-0047's gate).
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0044
+
+- **Screen / Route**: stay detail — Extend stay
+- **Domain**: Hotel / stays (037)
+- **Severity**: P0 blocker
+- **Actual**: `extend_stay` rejected — the client sent 4 args; the door requires
+  5 (`p_expected_version`, no default).
+- **Fix**: `stay-service.ts` sends the stay's version.
+- **Retest**: extend from the detail page → `[200]`; status → EXTENDED,
+  departure moved.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0045
+
+- **Screen / Route**: stay detail navigation
+- **Domain**: Hotel / routing
+- **Severity**: P1 major
+- **Actual**: three navigations used `/stays/…`, which is not a registered
+  route.
+- **Fix**: → `/hotel/stays/…`.
+- **Retest**: routes resolve; the detail page loads (UI-0046).
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0046
+
+- **Screen / Route**: `/hotel/stays/:id`
+- **Domain**: Hotel / stays read layer
+- **Severity**: P0 blocker
+- **Actual**: "Cannot load stay" — the read layer selected phantom columns on
+  `stay_guests` / `stay_room_moves` → 400s.
+- **Fix**: stay-service reads realigned to the executed columns.
+- **Retest**: both reads `[200]`; the detail page renders guests and room moves.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0047
+
+- **Screen / Route**: stay detail — action gating
+- **Domain**: Hotel / stays
+- **Severity**: P1 major
+- **Actual**: an EXTENDED stay (still in house) hid Move room / Check out — the
+  gates only allowed `CHECKED_IN`.
+- **Fix**: `canCheckOutThis` / `canMoveThis` include `EXTENDED`
+  (`StayDetailPage.tsx` ~270/272), matching the doors.
+- **Retest**: the EXTENDED stay was moved rooms and checked out (early
+  departure) through the UI; front desk in-house then cleared.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0048
+
+- **Screen / Route**: `/hotel/maintenance` — create request
+- **Domain**: Hotel / maintenance (039)
+- **Severity**: P0 blocker
+- **Actual**: `create_maintenance_request` param mismatch (404); the form also
+  collected an estimated cost the door does not take.
+- **Fix**: param names realigned; the estimated-cost field removed from the
+  sheet.
+- **Retest**: "AC dripping water" created; full lifecycle exercised with costs;
+  closing it flipped Room 102 back to ACTIVE (side-effect proven).
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0049
+
+- **Screen / Route**: maintenance request sheet — Room select
+- **Domain**: Hotel / maintenance
+- **Severity**: P3 cosmetic
+- **Actual**: duplicate "No specific room" — `roomOptions` already carries the
+  empty option and the sheet added a placeholder on top.
+- **Fix**: removed the placeholder (`MaintenancePage.tsx:992`).
+- **Retest**: options probe
+  `["No specific room[enabled]","Room 101[enabled]","Room 102[enabled]"]`.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0050
+
+- **Screen / Route**: `/hotel/lost-found`
+- **Domain**: Hotel / lost & found (039)
+- **Severity**: P1 major
+- **Actual**: every lost-found item was permanently stuck. Doors mint items as
+  FOUND and `return_lost_found_item` accepts any non-terminal status (039), but
+  the UI hid Return for FOUND items (`item.status !== "FOUND"` guard,
+  `LostFoundPage.tsx:431`) and no FOUND→STORED door exists.
+- **Fix**: client restriction removed — Return shows for any non-terminal item;
+  the door is the authority.
+- **Retest**: umbrella created (Room 101, "Front desk closet, shelf 2")
+  `create_lost_found_item [200]` reqid 11292 → Return →
+  `return_lost_found_item [200]` reqid 11303; pill FOUND → RETURNED.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0051
+
+- **Screen / Route**: shared `SelectInput` — all screens
+- **Domain**: Design system
+- **Severity**: P1 major
+- **Actual**: `renderOption` set `disabled={option.value === ""}` — every
+  empty-value option (placeholders like "No preference" / "No specific room",
+  and "All X" filter rows) became unselectable once a real choice was made and
+  could never be re-selected.
+- **Fix**: `src/components/ui/SelectInput.tsx` — empty-value options render
+  enabled; the placeholder renders an enabled `<option value="">`.
+- **Retest**: assets edit-sheet probe `roomHasEmptyEnabled: true`; maintenance
+  probe (UI-0049); assets category/status filters re-selectable after a choice.
+- **Regression**: none — pure enablement; no option value or ordering changed.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0052
+
+- **Screen / Route**: `/finance/invoices` · `/finance/payments` ·
+  `/finance/accounting` · `/finance/profit-loss` (all four finance screens)
+- **Domain**: Finance / read layer
+- **Severity**: P0 blocker — every screen violated §75: read failures were
+  swallowed by `const { data } = await` destructuring and the pages rendered
+  zeros, and two of the four reads were guaranteed to fail every time.
+- **Steps**:
+  1. Sign in as OWNER001 and open any finance screen.
+  2. Observe the KPIs and the absence of any error banner.
+  3. Check the network tab: the doomed selects return PGRST204 / 42703.
+- **Expected**: Reads name real columns; a failed read surfaces an error and
+  never silently renders zeros (§75).
+- **Actual**:
+  1. `FinanceInvoicesPage` selected `bills.table_name` (no such column —
+     PGRST204) and `folios.guest_name` (42703), so the whole page read failed
+     while rendering "no data".
+  2. `AccountingPage` and `ProfitLossPage` both read
+     `events.total_amount` — the `events` table has NO amount column
+     (042: `quoted_amount`/`actual_amount` live on `event_vendors` and are
+     vendor COST, not income; real event income is `event_payments.amount`).
+  3. On all four pages a failed read inside `Promise.all` was destructured
+     into `data = null` and never surfaced.
+  4. `AccountingPage` counted every purchase order as a commitment — the
+     Phase A data's 4 CANCELLED + 1 RECEIVED POs were labelled
+     "Purchase Orders (open)".
+- **Root cause**: the screens were written against an imagined schema
+  (Phase C build, tasks #216–#219) and the destructuring pattern hid the
+  resulting PGRST204/42703 from every reader.
+- **Files changed**: `FinanceInvoicesPage.tsx` (prior window), 
+  `FinancePaymentsPage.tsx` (prior window), `AccountingPage.tsx`,
+  `ProfitLossPage.tsx`.
+- **Fix**: phantom columns dropped (`table_name`, `guest_name`,
+  `events.total_amount` ×2); event income re-based onto
+  `event_payments.amount`; CANCELLED bills excluded from the invoices read;
+  open-PO row filtered to genuinely open statuses (DRAFT /
+  PENDING_APPROVAL / APPROVED / SENT / PARTIALLY_RECEIVED); every page now
+  throws `firstError` after its `Promise.all` so a failed read shows the
+  existing error banner. Customer fallbacks are literal
+  `"Walk-in"`/`"Guest"` instead of reading `guest_name`.
+- **Retest**: 2026-10-09 PASS — all four screens driven as OWNER001:
+  Invoices (2 invoices, Paid ₹523, Outstanding ₹0), Payments
+  (Received ₹523 / Made ₹27,925 / Net ₹−27,402 / 6 rows), Accounting
+  (Credits ₹523 / Debits ₹27,925 / **PO open ₹0**), P&L
+  (Income ₹523 / Expenses ₹27,925 / Net ₹−27,402 / margin −5239.4%).
+  Console clean; targeted tsc clean on the four files.
+- **Regression**: none — each KPI reconciles with the Phase A/B money on the
+  hosted DB.
+- **Status**: VERIFIED (2026-10-09)
+
+## UI-0053
+
+- **Screen / Route**: every route guarded by `src/app/routes.ts` permissions
+  that no migration granted — 62 keys across analytics, billing, commerce,
+  enterprise, events, experience, hr, marketing, revenue, integrations,
+  documents, settings, task/approval, plus `shift.manage`, `station.manage`,
+  `supplier.view`.
+- **Domain**: Access / RBAC drift
+- **Severity**: P0 blocker — dozens of built screens were unreachable for
+  EVERY user, including the organization owner ("Access restricted").
+- **Steps**:
+  1. Sign in as OWNER001 (pre-057: 312 permissions).
+  2. Navigate to `/finance/invoices` (guard `analytics.finance.view`).
+  3. Observe "Access restricted".
+- **Expected**: The route table's promise matches the database matrix — if a
+  screen is built and routed, its guard key is granted to the roles that
+  should reach it (006's own header warns exactly against this drift).
+- **Actual**: the client catalogue grew one vocabulary (route guards) while
+  the SQL matrix grew another (006/013/032/…); 62 guard keys existed in no
+  migration.
+- **Root cause**: two permission vocabularies evolved independently — the
+  exact donor-project failure 006's header documents.
+- **Files changed**: `db/supabase/057_route_guard_permission_grants.sql`
+  (new), `db/harness/apply-057-only.mjs` (new; ledger-recorded apply).
+- **Fix**: grant-only, idempotent migration 057: ORG_OWNER + ORG_ADMIN get
+  all 56 org-reachable keys; PLATFORM_ADMIN gets only the six
+  `platform.*.view` console keys (§41 — platform seat ≠ tenant role);
+  FINANCE_MANAGER gets the two finance analytics keys; EVENT_MANAGER and
+  HR_MANAGER get the view keys of their domains. Recorded in
+  `app.schema_migrations` as `057_route_guard_permission_grants.sql`.
+- **Retest**: 2026-10-09 PASS — probe counts correct per role
+  (ORG_OWNER/ORG_ADMIN 4-of-5 with `platform.dashboard.view` withheld;
+  FINANCE_MANAGER 2; EVENT_MANAGER 1; HR_MANAGER 1; PLATFORM_ADMIN 1);
+  after reload the access-debugging panel shows 353 permissions
+  (312 → 353) and `/finance/invoices` renders its data instead of
+  "Access restricted".
+- **Regression**: grant-only — nothing revoked; tenant isolation unchanged
+  (role_permissions are role-scoped, not row-scoped).
+- **Residual**: `revenue.pricing.edit` (edit-affordance gate inside
+  RateCalendar, `RateCalendar.tsx:28`) is still granted in no migration —
+  the route renders (its guard `revenue.pricing.view` IS in 057) but edit
+  affordances stay hidden for everyone. Not browser-observed yet; tracked in
+  the Appendix for Phase G (Revenue) with a probe-first rule.
+- **Status**: VERIFIED (2026-10-09)
+
+## Appendix · Phase B observations (recorded, NOT fixed this pass)
+
+| Item | Detail | Disposition |
+|---|---|---|
+| Rate-plan doors without UI surface | `/hotel/rate-plans` is not a registered route; the five 035 rate-plan doors have no client caller (the rate calendar lives at `/hotel/revenue/rates` under Revenue) | DEFERRED — surface or remove |
+| `revenue.pricing.view/edit` never seeded | **Update (2026-10-09, UI-0053)**: `revenue.pricing.view` and all other 61 route-guard keys are now granted by migration 057; `revenue.pricing.edit` (RateCalendar edit-affordance gate) remains ungranted — screens open, edit affordances hidden for everyone | PARTIALLY FIXED — `.edit` key deferred to Phase G with a probe-first rule |
+| Raw staff-UUID assign dialogs | assign actions (e.g. maintenance Assign) render a single unlabeled text input expecting a raw staff UUID | DEFERRED — needs a staff picker |
+| Housekeeping "Completed" pill | title case while every other status pill is uppercase | DEFERRED — cosmetic |
+| Checkout has no confirm dialog | checkout applies immediately on click | OBSERVATION only |

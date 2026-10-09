@@ -113,15 +113,14 @@ export async function createMaintenanceRequest(
   return callDoorRow<MaintenanceRequest>("create_maintenance_request", {
     p_organization: scope.organizationId,
     p_property: scope.propertyId,
-    p_room: params.roomId ?? null,
-    p_outlet: params.outletId ?? null,
-    p_asset: params.assetId ?? null,
     p_category: params.category,
-    p_priority: params.priority ?? "NORMAL",
-    p_source: params.source ?? "OTHER",
     p_title: params.title,
     p_description: params.description ?? null,
-    p_estimated_cost: params.estimatedCost ?? null,
+    p_priority: params.priority ?? "NORMAL",
+    p_source: params.source ?? "OTHER",
+    p_room_id: params.roomId ?? null,
+    p_outlet_id: params.outletId ?? null,
+    p_asset_id: params.assetId ?? null,
     p_notes: params.notes ?? null,
   });
 }

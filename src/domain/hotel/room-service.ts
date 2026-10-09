@@ -112,7 +112,7 @@ export async function createRoomType(
     p_description: params.description ?? null,
     p_max_occupancy: params.maxOccupancy,
     p_base_occupancy: params.baseOccupancy,
-    p_bed_configuration: params.bedConfiguration ?? null,
+    p_bed_configuration: params.bedConfiguration ?? [],
     p_room_size_sqft: params.roomSizeSqft ?? null,
   });
 }

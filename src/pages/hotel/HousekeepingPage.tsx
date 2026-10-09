@@ -709,6 +709,7 @@ function CreateTaskSheet({ scope, roomOptions, onClose, onSaved, onFailure }: Cr
           <SelectInput
             value={draft.roomId}
             options={roomOptions}
+            placeholder="Choose a room…"
             onChange={(value) => setDraft((d) => ({ ...d, roomId: value }))}
           />
         </Field>

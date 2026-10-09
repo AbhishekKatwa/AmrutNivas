@@ -302,39 +302,191 @@ Static overview — see §71 owner dashboard audit in FINAL_UI_QA_REPORT.md.
 
 ## HOTEL / HK / MX screens (Phase B)
 
-### HOTEL-FV-01 — Room types (`/hotel/room-types`) — NOT TESTED
+**Phase B status**: browser-driven 2026-10-09 as OWNER001 against the hosted DB — the chain guest → WALK_IN reservation → housekeeping task (room VACANT_CLEAN → INSPECTED) → front-desk check-in → extend → move → early-departure checkout, plus maintenance full lifecycle, lost-found create→return, and assets create→edit. Fields exercised in those flows are VERIFIED; the rest are marked "present; not individually exercised".
 
-### HOTEL-FV-02 — Rooms (`/hotel/rooms`) — NOT TESTED
+### HOTEL-FV-01 — Room types (`/hotel/room-types`) — VERIFIED (create path, retest after UI-0035/0036)
 
-### HOTEL-FV-03 — Reservations (`/hotel/reservations`) — NOT TESTED
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Code | text | yes | unique, e.g. EXEC | VERIFIED (retest) |
+| Name | text | yes | Executive Deluxe | VERIFIED (retest) |
+| Description | textarea | no | left blank | VERIFIED (retest, omitted) |
+| Max occupancy | number | yes | 3 | VERIFIED (retest) |
+| Base occupancy | number | yes | 2 | VERIFIED (retest) |
+| Room size sq ft | number | no | 320 | VERIFIED (retest) |
+| Bed configuration | (not in dialog) | no | door default `[]` | VERIFIED — UI-0035: client must send `[]`, not explicit null (23502) |
+| Create room type | action | yes | door `create_room_type` + 054 audit funnel | VERIFIED — UI-0036: 056 normalized audit slot 6 (42883); row renders "EXEC · 2–3 guests · 320 sq ft" |
+| Edit / Archive | actions | — | update/archive room type | present; not individually exercised |
+
+### HOTEL-FV-02 — Rooms (`/hotel/rooms`) — VERIFIED (create path)
+
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Room number | text | yes | unique per property | VERIFIED (retest — 102) |
+| Room type | dropdown | yes | room-type list | VERIFIED (retest — Executive Deluxe) |
+| Floor | text | no | free text | VERIFIED (retest — "2") |
+| Remaining optional fields | — | no | — | left at defaults in retest |
+| Create room | action | yes | door `create_room`, defaults the housekeeping status | VERIFIED (retest — Room 102 `b5401c49-7f22-4659-a92f-7ac4e0049396`; later returned to ACTIVE by the maintenance-close side effect) |
+| Edit / Archive | actions | — | — | present; not individually exercised |
+
+### HOTEL-FV-03 — Reservations (`/hotel/reservations`) — VERIFIED (create path)
+
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Guest | lookup (search → select) | yes | guest list | VERIFIED (retest — search → select flow → Rahul Deshmukh) |
+| Source | dropdown | yes | WALK_IN / … | VERIFIED (retest — WALK_IN) |
+| Arrival | date | yes | — | VERIFIED (retest — 2026-10-09) |
+| Departure | date | yes | ≥ arrival | VERIFIED (retest — 2026-10-11) |
+| Adults / Children / Infants | number | yes | ≥ 0 | VERIFIED (retest — 2 / 0 / 0) |
+| Room type | dropdown | yes | room-type list | VERIFIED (retest — EXEC) |
+| Special requests | text | no | left blank | VERIFIED (retest, omitted) |
+| Create reservation | action | yes | door `create_reservation` | VERIFIED (retest — RES-2026-00001 CONFIRMED) |
+| Cancel / modify actions | — | — | — | present; not individually exercised |
 
 ### HOTEL-FV-04 — Reservation detail (`/hotel/reservations/:reservationId`) — NOT TESTED
 
-### HOTEL-FV-05 — Front desk (`/hotel/front-desk`) — NOT TESTED
+The chain went through the front desk, not the reservation detail page.
 
-### HOTEL-FV-06 — Stay detail (`/hotel/stays/:stayId`) — NOT TESTED
+### HOTEL-FV-05 — Front desk (`/hotel/front-desk`) — VERIFIED (availability + arrival + in-house)
 
-### HOTEL-FV-07 — Guests (`/hotel/guests`) — NOT TESTED
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Availability (room stats) | derived | n/a | sellable = operationalStatus ACTIVE + housekeeping (VACANT_CLEAN \| INSPECTED) | VERIFIED — UI-0040: 3 sellable-filter sites fixed; "Available 1" |
+| Arrival row | list | n/a | offers sellable rooms for the arrival | VERIFIED (retest — Room 101 offered for RES-2026-00001) |
+| Check-in | action | yes | gates on real keys (`frontoffice.checkin`) + door `check_in` (5 args incl. `p_expected_check_out`) | VERIFIED — UI-0041/0042: `[200]`, stay created |
+| In-house list | list | n/a | shows current stays | VERIFIED (guest listed while in house; cleared after early-departure checkout) |
 
-### HOTEL-FV-08 — Lost & found (`/hotel/lost-found`) — NOT TESTED
+### HOTEL-FV-06 — Stay detail (`/hotel/stays/:stayId`) — VERIFIED (extend / move / early-departure checkout)
 
-### HOTEL-FV-09 — Assets (`/hotel/assets`) — NOT TESTED
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Stay read (guests, room moves) | read | n/a | real columns only | VERIFIED — UI-0046: both reads `[200]`, page renders |
+| Extend stay | action | yes | door `extend_stay` + `p_expected_version` | VERIFIED — UI-0044: `[200]`, status → EXTENDED |
+| Move room | action + reason dropdown | yes | door `move_room` `p_new_room` + `p_reason` (Guest request / Maintenance / Upgrade / Operational / Other) | VERIFIED — UI-0043/0047: moved Room 101 → Room 102 on the EXTENDED stay |
+| Check out | action | yes | gates include EXTENDED | VERIFIED — UI-0047: early-departure checkout succeeded |
+| Routes to detail | navigation | n/a | `/hotel/stays/…` registered | VERIFIED — UI-0045 |
 
-### HK-FV-01 — Housekeeping (`/hotel/housekeeping`) — NOT TESTED
+### HOTEL-FV-07 — Guests (`/hotel/guests`) — VERIFIED (create path)
 
-### MAINT-FV-01 — Maintenance (`/hotel/maintenance`) — NOT TESTED
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Full name | text | yes | non-empty | VERIFIED (retest — Rahul Deshmukh) |
+| Phone | text | no | free text | VERIFIED (retest — +91 98220 11223) |
+| Remaining optional fields | — | no | — | left at defaults in retest |
+| Create guest | action | yes | door `create_guest`; client mints `p_guest_code` (GST-…), DOB arg renamed, source defaults DIRECT | VERIFIED — UI-0037 |
+
+### HOTEL-FV-08 — Lost & found (`/hotel/lost-found`) — VERIFIED (create → return)
+
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Item name | text | yes | non-empty | VERIFIED (retest — umbrella) |
+| Room | dropdown | yes | room list | VERIFIED (retest — Room 101) |
+| Location description | text | no | free text | VERIFIED (retest — "Front desk closet, shelf 2") |
+| Remaining optional fields | — | no | — | left at defaults in retest |
+| Create item | action | yes | door mints status FOUND | VERIFIED — `create_lost_found_item [200]` reqid 11292 |
+| Return | action | yes | door accepts any non-terminal → RETURNED | VERIFIED — UI-0050: `return_lost_found_item [200]` reqid 11303; pill FOUND → RETURNED |
+| Dispose | action | — | — | present; not individually exercised |
+
+### HOTEL-FV-09 — Assets (`/hotel/assets`) — VERIFIED (create + edit)
+
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Asset code | text | yes | non-empty; disabled while editing | VERIFIED (retest — AC-101) |
+| Name | text | yes | non-empty | VERIFIED (retest — Split AC 1.5 ton) |
+| Category | dropdown | yes | AC / TV / … | VERIFIED (retest — AC) |
+| Room | dropdown | no | "No specific room" empty option enabled | VERIFIED (retest — Room 101; UI-0051 fix live) |
+| Location description | text | no | free text | VERIFIED (retest — "Above the wardrobe") |
+| Serial number | text | no | free text | VERIFIED (retest — SN-DAIKIN-2026-0115) |
+| Manufacturer | text | no | free text | VERIFIED (retest — Daikin) |
+| Model number | text | no | free text | VERIFIED (retest — FTKF50TV16) |
+| Purchase date | date | no | — | VERIFIED (retest — 2026-01-15) |
+| Purchase cost | currency | no | ≥ 0 | VERIFIED (retest — 38500) |
+| Warranty end date | date | no | — | VERIFIED (retest — 2031-01-15) |
+| Notes | textarea | no | free text | VERIFIED (retest — set at create, then changed in edit) |
+| Create asset | action | yes | door `create_asset` (13 args) | VERIFIED — `create_asset [200]` reqid 11600 |
+| Save changes (edit) | action | yes | door `update_asset`; sparse input + `p_expected_version`; untouched fields sent null = unchanged | VERIFIED — `update_asset [200]` reqid 11604; notes-only edit preserved the Room 101 link (null-means-unchanged proven) |
+
+### HK-FV-01 — Housekeeping (`/hotel/housekeeping`) — VERIFIED (full task workflow)
+
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Room | dropdown | yes | honest unselected state | VERIFIED — UI-0038: placeholder "Choose a room…" |
+| Task type | dropdown | yes | task-type list | VERIFIED (retest) |
+| Priority | dropdown | no | — | left at default in retest |
+| Notes | text | no | — | left at default in retest |
+| Create task | action | yes | door `create_housekeeping_task` (`p_stay_id`, not `p_stay`) | VERIFIED — UI-0039 |
+| Assign / Start / Complete / Verify | actions | yes | PENDING → ASSIGNED → IN_PROGRESS → COMPLETED → verified | VERIFIED (retest — full chain on Room 101; room VACANT_CLEAN → INSPECTED) |
+
+### MAINT-FV-01 — Maintenance (`/hotel/maintenance`) — VERIFIED (full lifecycle)
+
+| Field | Type | Req | Validation | Status |
+|---|---|---|---|---|
+| Title / description | text | yes | non-empty | VERIFIED (retest — "AC dripping water") |
+| Room | dropdown | yes | no duplicate empty option | VERIFIED — UI-0049 fix probe `["No specific room[enabled]","Room 101[enabled]","Room 102[enabled]"]` |
+| Estimated cost | (removed) | — | door takes no such param | VERIFIED — UI-0048: field removed from the sheet |
+| Create request | action | yes | door `create_maintenance_request` | VERIFIED — UI-0048 |
+| Assign | action | yes | raw staff-UUID text input (see ledger observation) | VERIFIED — `assign_maintenance_request [200]` reqid 10097 |
+| Start | action | yes | — | VERIFIED — `[200]` reqid 10101 |
+| Resolve (with costs) | action | yes | cost fields | VERIFIED — `[200]` reqid 10105 |
+| Verify | action | yes | — | VERIFIED — `[200]` reqid 10109 |
+| Close | action | yes | side effect: room back to ACTIVE | VERIFIED — `[200]` reqid 10113; Room 102 → ACTIVE |
 
 ---
 
 ## FINANCE screens (Phase C)
 
-### FIN-FV-01 — Invoices (`/finance/invoices`) — NOT TESTED
+**Phase C status**: browser-driven 2026-10-09 as OWNER001 against the hosted DB after the read-layer fixes (UI-0052) and the route-guard grant migration 057 (UI-0053). All four screens are read-only ledgers — no forms — so fields below are the KPI cards and list rows; each was checked against the known Phase A/B money (bills ₹523 PAID, supplier payments ₹27,925 + ₹100, folio unsettled, no event payments, 5 POs all CANCELLED/RECEIVED).
 
-### FIN-FV-02 — Payments (`/finance/payments`) — NOT TESTED
+### FIN-FV-01 — Invoices (`/finance/invoices`) — VERIFIED (UI-0052)
 
-### FIN-FV-03 — Accounting (`/finance/accounting`) — NOT TESTED
+| Field | Type | Req | Validation | Tested | Result | Issue | Fix | Retest | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| Total Invoices | KPI | n/a | count of bills (excl. CANCELLED) + folios | render | PASS | UI-0052 phantom `bills.table_name` + `folios.guest_name` | columns dropped; CANCELLED excluded; errors now thrown | 2026-10-09 PASS | PASS |
+| Outstanding | KPI | n/a | UNPAID/PARTIALLY_PAID bills | render | PASS | — | — | — | PASS |
+| Paid | KPI | n/a | PAID bills | render | PASS | — | — | — | PASS |
+| Revenue | KPI | n/a | sum of bill totals | render | PASS | — | — | — | PASS |
+| Invoice rows | list | n/a | bill no · party · status · amount · date | render (2 rows) | PASS | — | — | — | PASS |
 
-### FIN-FV-04 — P&L (`/finance/profit-loss`) — NOT TESTED
+Observed: Total Invoices 2 · Outstanding ₹0 · Paid ₹523 · Revenue ₹523; BILL-000001 ₹248 PAID + BILL-000002 ₹275 PAID ("Walk-in · Restaurant", 09/10/2026). Permissions 353 after 057.
+
+### FIN-FV-02 — Payments (`/finance/payments`) — VERIFIED (UI-0052)
+
+| Field | Type | Req | Validation | Tested | Result | Issue | Fix | Retest | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| Received | KPI | n/a | sum of money-in rows | render | PASS | UI-0052 swallowed read errors | firstError thrown after Promise.all | 2026-10-09 PASS | PASS |
+| Made | KPI | n/a | sum of supplier payments | render | PASS | — | — | — | PASS |
+| Net Flow | KPI | n/a | in − out | render | PASS | — | — | — | PASS |
+| Transactions | KPI | n/a | row count | render | PASS | — | — | — | PASS |
+| Recent payments | list | n/a | ref · source · method · date · ± amount | render (6 rows) | PASS | — | — | — | PASS |
+
+Observed: Received ₹523 (100+48+100+275) · Made ₹27,925 · Net ₹−27,402 · 6 rows (4 Received + 2 Paid, CASH/CARD/UPI/BANK_TRANSFER).
+
+### FIN-FV-03 — Accounting (`/finance/accounting`) — VERIFIED (UI-0052)
+
+| Field | Type | Req | Validation | Tested | Result | Issue | Fix | Retest | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| Accounts (active categories) | KPI | n/a | summary group count | render | PASS | — | — | — | PASS |
+| Credits | KPI | n/a | revenue accounts | render | PASS | — | — | — | PASS |
+| Debits | KPI | n/a | expense accounts | render | PASS | — | — | — | PASS |
+| Net | KPI | n/a | credits − debits | render | PASS | — | — | — | PASS |
+| Restaurant Sales / Room / Event | breakdown | n/a | bills / settled folios / **event_payments** | render | PASS | UI-0052: events had no `total_amount` column (phantom) | event income re-based onto `event_payments.amount` | 2026-10-09 PASS | PASS |
+| Procurement Payments | expense row | n/a | POSTED supplier payments | render | PASS | — | — | — | PASS |
+| Purchase Orders (open) | commitment row | n/a | only genuinely open statuses | render | PASS | UI-0052: unfiltered PO read mislabelled CANCELLED/RECEIVED as commitments | `.in(status, [DRAFT, PENDING_APPROVAL, APPROVED, SENT, PARTIALLY_RECEIVED])` | 2026-10-09 PASS | PASS |
+
+Observed: Credits ₹523 · Debits ₹27,925 · Net ₹−27,402 · Room/Event ₹0 · **Purchase Orders (open) ₹0** (the 5 seeded POs are all CANCELLED/RECEIVED and are now correctly excluded).
+
+### FIN-FV-04 — P&L (`/finance/profit-loss`) — VERIFIED (UI-0052)
+
+| Field | Type | Req | Validation | Tested | Result | Issue | Fix | Retest | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| Total Income | KPI | n/a | restaurant + hotel + events | render | PASS | UI-0052 phantom `events.total_amount` | event income re-based onto `event_payments.amount` | 2026-10-09 PASS | PASS |
+| Total Expenses | KPI | n/a | POSTED supplier payments | render | PASS | — | — | — | PASS |
+| Net Profit | KPI | n/a | income − expenses | render | PASS | — | — | — | PASS |
+| Margin | KPI | n/a | profit % | render | PASS | — | — | — | PASS |
+| Income breakdown | bars | n/a | shares of income | render | PASS | — | — | — | PASS |
+| Summary | block | n/a | gross income / expenses / net | render | PASS | — | — | — | PASS |
+
+Observed: Income ₹523 (Restaurant 100.0%) · Expenses ₹27,925 · Net ₹−27,402 · Margin −5239.4% (−27,402/523 — arithmetic verified). Console clean on all four screens; no error banner anywhere (reads now surface failures instead of rendering zeros).
 
 ---
 

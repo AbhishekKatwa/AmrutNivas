@@ -20,7 +20,6 @@ import { LoadingBlock } from "@/components/ui/Spinner";
 import { SelectInput, type SelectOption } from "@/components/ui/SelectInput";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TextInput } from "@/components/ui/TextInput";
-import { Textarea } from "@/components/ui/Textarea";
 import { can, type ActiveContext } from "@/domain/identity/types";
 import {
   ROOM_MOVE_REASONS,
@@ -113,9 +112,9 @@ export default function StayDetailPage() {
   const scope = useMemo(() => hotelScopeFor(context), [context.organizationId, context.propertyId]);
 
   const canView = can("stay.view", permissions);
-  const canCheckOut = can("stay.check_out", permissions);
-  const canExtend = can("stay.edit", permissions);
-  const canMoveRoom = can("stay.edit", permissions);
+  const canCheckOut = can("frontoffice.checkout", permissions);
+  const canExtend = can("stay.modify", permissions);
+  const canMoveRoom = can("frontoffice.room_move", permissions);
 
   const [stay, setStay] = useState<Stay | null>(null);
   const [guest, setGuest] = useState<Guest | null>(null);
@@ -137,7 +136,6 @@ export default function StayDetailPage() {
   const [movingRoom, setMovingRoom] = useState(false);
   const [moveToRoomId, setMoveToRoomId] = useState("");
   const [moveReason, setMoveReason] = useState<RoomMoveReason>("GUEST_REQUEST");
-  const [moveNotes, setMoveNotes] = useState("");
   const [moveBusy, setMoveBusy] = useState(false);
 
   useEffect(() => {
@@ -161,8 +159,8 @@ export default function StayDetailPage() {
         return Promise.all([
           getGuest({ organizationId: scope.organizationId }, s.primaryGuestId),
           loadRoom(scope, s.roomId),
-          getStayGuests(scope, s.id),
-          getStayRoomMoves(scope, s.id),
+          getStayGuests(s.id),
+          getStayRoomMoves(s.id),
           listRooms(scope),
           listRoomTypes(scope),
           getFolioByStay(scope, s.id).then((f) => f !== null),
@@ -205,7 +203,7 @@ export default function StayDetailPage() {
         r.id !== stay.roomId &&
         r.archivedAt == null &&
         r.operationalStatus === "ACTIVE" &&
-        r.housekeepingStatus === "VACANT_CLEAN" &&
+        (r.housekeepingStatus === "VACANT_CLEAN" || r.housekeepingStatus === "INSPECTED") &&
         (room === null || r.roomTypeId === room.roomTypeId),
     );
   }, [rooms, stay, room]);
@@ -241,7 +239,7 @@ export default function StayDetailPage() {
     if (stay === null || scope === null || newCheckOutDate === "") return;
     setExtendBusy(true);
     try {
-      await extendStay(scope, stay.id, newCheckOutDate);
+      await extendStay(scope, stay.id, newCheckOutDate, stay.version);
       setExtending(false);
       setNewCheckOutDate("");
       setActionError(null);
@@ -257,10 +255,9 @@ export default function StayDetailPage() {
     if (stay === null || scope === null || moveToRoomId === "") return;
     setMoveBusy(true);
     try {
-      await moveRoom(scope, stay.id, moveToRoomId, moveReason, moveNotes.trim() || undefined);
+      await moveRoom(scope, stay.id, moveToRoomId, moveReason);
       setMovingRoom(false);
       setMoveToRoomId("");
-      setMoveNotes("");
       setActionError(null);
       reload();
     } catch (error) {
@@ -270,9 +267,10 @@ export default function StayDetailPage() {
     }
   };
 
-  const canCheckOutThis = canCheckOut && stay !== null && stay.status === "CHECKED_IN";
-  const canExtendThis = canExtend && stay !== null && (stay.status === "CHECKED_IN" || stay.status === "EXTENDED");
-  const canMoveThis = canMoveRoom && stay !== null && stay.status === "CHECKED_IN";
+  const inHouse = stay !== null && (stay.status === "CHECKED_IN" || stay.status === "EXTENDED");
+  const canCheckOutThis = canCheckOut && inHouse;
+  const canExtendThis = canExtend && inHouse;
+  const canMoveThis = canMoveRoom && inHouse;
 
   if (view === "bootstrapping") return <LoadingBlock label="Loading your workspace…" />;
 
@@ -463,7 +461,6 @@ export default function StayDetailPage() {
                   </span>
                   <span className="text-xs text-muted">
                     {formatDateTime(move.movedAt)}
-                    {move.notes && ` · ${move.notes}`}
                   </span>
                 </div>
               ))}
@@ -535,14 +532,6 @@ export default function StayDetailPage() {
                 options={moveReasonOptions()}
                 disabled={moveBusy}
                 onChange={(value) => setMoveReason(value as RoomMoveReason)}
-              />
-            </Field>
-            <Field label="Notes">
-              <Textarea
-                value={moveNotes}
-                disabled={moveBusy}
-                onChange={(event) => setMoveNotes(event.target.value)}
-                placeholder="Optional notes about the move…"
               />
             </Field>
           </div>

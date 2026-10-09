@@ -2,8 +2,9 @@
  * Front desk — the day's operational picture.
  *
  * Three lists, all read from the reservation and stay services: today's expected arrivals
- * (CONFIRMED reservations whose arrival date is today), today's expected departures (CHECKED_IN
- * stays whose expected check-out is today), and currently in-house guests (CHECKED_IN stays).
+ * (CONFIRMED reservations whose arrival date is today), today's expected departures (in-house
+ * stays whose expected check-out is today), and currently in-house guests (CHECKED_IN/EXTENDED
+ * stays — the doors treat EXTENDED as still in-house).
  *
  * The screen is a triage board, not a detail page. Each row offers the one action the desk
  * needs most: check-in for arrivals, check-out for departures, and a link to the stay for
@@ -85,8 +86,8 @@ export default function FrontDeskPage() {
   const scope = useMemo(() => hotelScopeFor(context), [context.organizationId, context.propertyId]);
 
   const canView = can("reservation.view", permissions) || can("stay.view", permissions);
-  const canCheckIn = can("stay.check_in", permissions);
-  const canCheckOut = can("stay.check_out", permissions);
+  const canCheckIn = can("frontoffice.checkin", permissions);
+  const canCheckOut = can("frontoffice.checkout", permissions);
 
   const [arrivals, setArrivals] = useState<Reservation[] | null>(null);
   const [departures, setDepartures] = useState<Stay[] | null>(null);
@@ -113,7 +114,7 @@ export default function FrontDeskPage() {
 
     Promise.all([
       listReservations(scope, { status: "CONFIRMED", arrivalDateFrom: today, arrivalDateTo: today }),
-      listStays(scope, { status: "CHECKED_IN" }),
+      listStays(scope, { status: ["CHECKED_IN", "EXTENDED"] }),
       listRooms(scope),
       listRoomTypes(scope),
     ])
@@ -156,9 +157,9 @@ export default function FrontDeskPage() {
   const handleCheckIn = async (reservation: Reservation, roomId: string) => {
     if (scope === null) return;
     try {
-      const stay = await doCheckIn(scope, reservation.id, roomId);
+      const stay = await doCheckIn(scope, reservation.id, roomId, reservation.departureDate);
       setActionError(null);
-      navigate(`/stays/${stay.id}`);
+      navigate(`/hotel/stays/${stay.id}`);
     } catch (error) {
       report(error);
     }
@@ -177,7 +178,12 @@ export default function FrontDeskPage() {
 
   const roomStats = useMemo(() => {
     const active = rooms.filter((r) => r.archivedAt == null);
-    const available = active.filter((r) => r.operationalStatus === "ACTIVE" && r.housekeepingStatus === "VACANT_CLEAN");
+    // INSPECTED is the terminal state of a verified checkout clean — a verified room is sellable.
+    const available = active.filter(
+      (r) =>
+        r.operationalStatus === "ACTIVE" &&
+        (r.housekeepingStatus === "VACANT_CLEAN" || r.housekeepingStatus === "INSPECTED"),
+    );
     const occupied = active.filter((r) => r.housekeepingStatus === "OCCUPIED_CLEAN" || r.housekeepingStatus === "OCCUPIED_DIRTY");
     const dirty = active.filter((r) => r.housekeepingStatus === "VACANT_DIRTY");
     const ooo = active.filter((r) => r.operationalStatus === "OUT_OF_ORDER" || r.operationalStatus === "OUT_OF_SERVICE");
@@ -299,7 +305,7 @@ export default function FrontDeskPage() {
                       (r) =>
                         r.archivedAt == null &&
                         r.operationalStatus === "ACTIVE" &&
-                        r.housekeepingStatus === "VACANT_CLEAN" &&
+                        (r.housekeepingStatus === "VACANT_CLEAN" || r.housekeepingStatus === "INSPECTED") &&
                         (res.roomTypeId === null || r.roomTypeId === res.roomTypeId),
                     )}
                     canCheckIn={canCheckIn}
@@ -331,7 +337,7 @@ export default function FrontDeskPage() {
                     room={roomById.get(stay.roomId) ?? null}
                     canCheckOut={canCheckOut}
                     onCheckOut={() => void handleCheckOut(stay)}
-                    onOpen={() => navigate(`/stays/${stay.id}`)}
+                    onOpen={() => navigate(`/hotel/stays/${stay.id}`)}
                   />
                 ))}
               </div>
@@ -357,7 +363,7 @@ export default function FrontDeskPage() {
                     key={stay.id}
                     stay={stay}
                     room={roomById.get(stay.roomId) ?? null}
-                    onOpen={() => navigate(`/stays/${stay.id}`)}
+                    onOpen={() => navigate(`/hotel/stays/${stay.id}`)}
                   />
                 ))}
               </div>

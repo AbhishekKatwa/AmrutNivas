@@ -428,7 +428,7 @@ function ItemCard({ item, room, canReturn, onReturn }: ItemCardProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            {!isTerminal && item.status !== "FOUND" && canReturn && (
+            {!isTerminal && canReturn && (
               <Button
                 size="sm"
                 variant="secondary"

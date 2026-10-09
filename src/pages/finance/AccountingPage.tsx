@@ -38,17 +38,21 @@ export default function AccountingPage() {
       try {
         const sb = requireSupabase();
 
-        const [billsRes, foliosRes, eventsRes, supplierRes, poRes] = await Promise.all([
+        const [billsRes, foliosRes, eventPaymentsRes, supplierRes, poRes] = await Promise.all([
           sb.from("bills").select("grand_total").eq("organization_id", organizationId).eq("status", "PAID"),
           sb.from("folios").select("total_charges").eq("organization_id", organizationId).eq("status", "SETTLED"),
-          sb.from("events").select("total_amount").eq("organization_id", organizationId).eq("status", "COMPLETED"),
+          sb.from("event_payments").select("amount").eq("organization_id", organizationId),
           sb.from("supplier_payments").select("total_amount").eq("organization_id", organizationId).eq("status", "POSTED"),
-          sb.from("purchase_orders").select("grand_total").eq("organization_id", organizationId),
+          sb.from("purchase_orders").select("grand_total").eq("organization_id", organizationId).in("status", ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT", "PARTIALLY_RECEIVED"]),
         ]);
+
+        const firstError =
+          billsRes.error || foliosRes.error || eventPaymentsRes.error || supplierRes.error || poRes.error;
+        if (firstError) throw firstError;
 
         const restaurantRevenue = billsRes.data?.reduce((s, b) => s + Number(b.grand_total || 0), 0) || 0;
         const roomRevenue = foliosRes.data?.reduce((s, f) => s + Number(f.total_charges || 0), 0) || 0;
-        const eventRevenue = eventsRes.data?.reduce((s, e) => s + Number(e.total_amount || 0), 0) || 0;
+        const eventRevenue = eventPaymentsRes.data?.reduce((s, e) => s + Number(e.amount || 0), 0) || 0;
         const paymentsMade = supplierRes.data?.reduce((s, p) => s + Number(p.total_amount || 0), 0) || 0;
         const poValue = poRes.data?.reduce((s, p) => s + Number(p.grand_total || 0), 0) || 0;
 

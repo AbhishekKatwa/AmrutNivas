@@ -70,9 +70,6 @@ export function SelectInput<T extends string>({
       key={option.value}
       value={option.value}
       title={option.description}
-      // A value that is the current selection must still render; an empty value is
-      // reserved for the placeholder, so a real option is never blank.
-      disabled={option.value === ""}
     >
       {option.label}
     </option>
@@ -98,9 +95,7 @@ export function SelectInput<T extends string>({
         {...rest}
       >
         {placeholder !== undefined && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
+          <option value="">{placeholder}</option>
         )}
         {grouped
           ? options.map((option) =>

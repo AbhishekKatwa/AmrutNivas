@@ -115,6 +115,13 @@ export async function listGuestDocuments(
 
 /* --------------------------------------------------------------------- writes */
 
+function generateGuestCode(): string {
+  return `GST-${Date.now().toString(36).toUpperCase()}${Math.random()
+    .toString(36)
+    .slice(2, 5)
+    .toUpperCase()}`;
+}
+
 /** Create a new guest. */
 export async function createGuest(
   scope: GuestScope,
@@ -134,16 +141,17 @@ export async function createGuest(
 ): Promise<Guest> {
   return callDoorRow<Guest>("create_guest", {
     p_organization: scope.organizationId,
+    p_guest_code: generateGuestCode(),
     p_first_name: params.firstName,
     p_last_name: params.lastName,
     p_phone: params.phone ?? null,
     p_email: params.email ?? null,
-    p_dob: params.dateOfBirth ?? null,
+    p_date_of_birth: params.dateOfBirth ?? null,
     p_nationality: params.nationality ?? null,
     p_gender: params.gender ?? null,
     p_address_line1: params.address ?? null,
     p_vip_status: params.vipStatus ?? "REGULAR",
-    p_source: params.source ?? null,
+    p_source: params.source ?? "DIRECT",
     p_notes: params.notes ?? null,
   });
 }
@@ -175,7 +183,7 @@ export async function updateGuest(
     p_last_name: params.lastName,
     p_phone: params.phone,
     p_email: params.email,
-    p_dob: params.dateOfBirth,
+    p_date_of_birth: params.dateOfBirth,
     p_nationality: params.nationality,
     p_gender: params.gender,
     p_address_line1: params.address,

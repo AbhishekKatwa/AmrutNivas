@@ -12,17 +12,17 @@ Per Master Prompt #36 §59. Volume of realistic demo data created through the UI
 | Departments | 10+ | 8 (seed) | front-office, HK, F&B, kitchen, maintenance, FOH, restaurant-kitchen, bar |
 | Users | 15-30 | 5 (seed: OWNER / MANAGER / STAFF / HOUSEKEEPING / FINANCE) | demo creds only |
 | Employees | 30-75 | 0 | — |
-| Customers / Guests | 100+ | 0 | — |
+| Customers / Guests | 100+ | 1 (Phase B retest) | Rahul Deshmukh |
 | Suppliers | 30+ | 3 (small-batch retest) | + 1 debug supplier archived |
 | Inventory Items | 150+ | 10 (small-batch retest) | — |
 | Categories | 30+ | 0 | — |
 | Menu Items | 150+ | 0 | — |
 | Modifiers | 50+ | 0 | — |
 | Tables | 50+ | 0 | — |
-| Rooms | 100+ | 0 | — |
-| Room Types | 10+ | 0 | — |
+| Rooms | 100+ | 1 (Phase B retest) | Room 102; seed provides the rest |
+| Room Types | 10+ | 1 (Phase B retest) | EXEC — Executive Deluxe |
 | Rate Plans | 10+ | 0 | — |
-| Reservations | 100+ | 0 | — |
+| Reservations | 100+ | 1 (small-batch retest) | RES-2026-00001 |
 | Orders | 200+ | 0 | — |
 | Invoices / Bills | 100+ | 0 | — |
 | Purchase Requests | 50+ | 0 | — |
@@ -31,8 +31,8 @@ Per Master Prompt #36 §59. Volume of realistic demo data created through the UI
 | Payments | 100+ | 2 | ₹27,825 + ₹100 (allocation proof) |
 | Events | 30+ | 0 | — |
 | Tasks | 100+ | 0 | — |
-| Maintenance Requests | 50+ | 0 | — |
-| Housekeeping Tasks | 100+ | 0 | — |
+| Maintenance Requests | 50+ | 1 (Phase B retest) | "AC dripping water" — full lifecycle |
+| Housekeeping Tasks | 100+ | 1 (Phase B retest) | Room 101 — full workflow |
 | Expenses | 100+ | 0 | — |
 | CRM interactions | 100+ | 0 | — |
 | Feedback records | 50+ | 0 | — |
@@ -108,11 +108,32 @@ DB-side actions taken during the retest (documented for auditability):
 
 - `051_seed_units_categories.sql` — units_of_measure + inventory_categories seed (UI-0030).
 - `055_app_evaluate_access_overload.sql` — 3-arg guard overload for the seven 031 doors (UI-0034).
-- **Hosted ledger discrepancy**: `app.schema_migrations` records 000–049 **plus 055**, but 050–054 are applied-yet-unrecorded (they were applied out-of-band while under edit). A future `remote-apply.mjs apply` run will list 050–054 as unapplied and re-attempt them — reconcile the ledger (manual INSERT of those five names) before the next hosted apply.
+- `056_hotel_audit_calls.sql` — 47 hotel doors re-created with audit slot 6 normalized (UI-0036); applied + ledger-recorded via `db/harness/apply-056-only.mjs` (targeted single-file apply because of the ledger gap below).
+- **Hosted ledger discrepancy**: `app.schema_migrations` records 000–049 **plus 055** (and now 056), but 050–054 are applied-yet-unrecorded (they were applied out-of-band while under edit). A future `remote-apply.mjs apply` run will list 050–054 as unapplied and re-attempt them — reconcile the ledger (manual INSERT of those five names) before the next hosted apply.
 
 ## Phase B — Hotel / HK / MX data
 
+Browser-driven 2026-10-09 as OWNER001 against the hosted DB (small-batch retest). One continuous chain: guest → reservation → HK task → check-in → extend → move → checkout → maintenance lifecycle → lost-found → asset.
+
+| Record | Detail |
+|---|---|
+| Room type EXEC | Executive Deluxe · 2–3 guests · 320 sq ft · bed_configuration `[]` — first write through the repaired create_room_type + 056 audit funnel (UI-0035/0036). Created via UI on `/hotel/room-types`. |
+| Guest Rahul Deshmukh | +91 98220 11223 · id `b5be2042-2548-4373-8575-15d9d8225c72` · client mints the `GST-…` guest code (UI-0037). Created via `/hotel/guests`. |
+| Room 102 | Executive Deluxe · Floor 2 · id `b5401c49-7f22-4659-a92f-7ac4e0049396` · housekeeping status door-defaulted. Created via `/hotel/rooms`. |
+| Reservation RES-2026-00001 | WALK_IN · guest chosen via the search→select flow · 2026-10-09→2026-10-11 · 2 adults / 0 children / 0 infants · EXEC · CONFIRMED. Created via `/hotel/reservations`. |
+| Housekeeping task (Room 101) | Full workflow driven: create → assign → start → complete → verify; room VACANT_CLEAN→INSPECTED (UI-0038/0039). |
+| Stay `ff5ef366-6d3c-43bb-96ca-92b99fa4ab3b` | Check-in → extend (EXTENDED, UI-0044) → move Room 101→102 (UI-0043, reason required) → early-departure checkout (UI-0047). All writes [200]. |
+| Maintenance "AC dripping water" | Room 102 · assign [200] reqid 10097 → start 10101 → resolve 10105 (costs booked) → verify 10109 → close 10113; close side effect: Room 102 → ACTIVE. |
+| Lost-found umbrella | Room 101 · "Front desk closet, shelf 2" · create reqid 11292 → return reqid 11303 · FOUND→RETURNED (UI-0050). |
+| Asset AC-101 | Split AC 1.5 ton · AC · Room 101 · "Above the wardrobe" · SN-DAIKIN-2026-0115 · Daikin FTKF50TV16 · installed 2026-01-15 · ₹38,500 · warranty to 2031-01-15 · create [200] reqid 11600; notes-only edit reqid 11604 — Room 101 survived the edit (null-means-unchanged proven). |
+
 ## Phase C — Finance data
+
+**No records created** — the four finance screens (`/finance/invoices`, `/finance/payments`, `/finance/accounting`, `/finance/profit-loss`) are read-only ledgers; Phase C verified their reads against the existing Phase A/B dataset (bills ₹523 PAID, supplier payments ₹27,825 + ₹100, folio unsettled, no event payments, 5 POs all CANCELLED/RECEIVED). All four screens rendered reconciling KPIs with permissions 353.
+
+DB-side action taken during Phase C (documented for auditability):
+
+- `057_route_guard_permission_grants.sql` — grant-only RBAC convergence for the 62 route-guard keys that existed in no migration (UI-0053); applied + ledger-recorded via `db/harness/apply-057-only.mjs`. Owner permission count 312 → 353. Residual: `revenue.pricing.edit` still ungranted (Phase G).
 
 ## Phase D — CRM / Events / HR data
 

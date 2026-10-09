@@ -391,7 +391,6 @@ export const STAY_GUEST_ROLES: readonly StayGuestRole[] = ["PRIMARY", "ADDITIONA
 
 export type StayGuest = {
   id: string;
-  organizationId: string;
   stayId: string;
   guestId: string;
   role: StayGuestRole;
@@ -412,13 +411,11 @@ export const ROOM_MOVE_REASONS: readonly RoomMoveReason[] = [
 
 export type StayRoomMove = {
   id: string;
-  organizationId: string;
   stayId: string;
   fromRoomId: string;
   toRoomId: string;
   movedAt: string;
   reason: RoomMoveReason;
-  notes: string | null;
   movedBy: string;
 };
 
