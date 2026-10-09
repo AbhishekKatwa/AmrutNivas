@@ -67,7 +67,9 @@ export async function listPurchaseInvoices(
     .eq("organization_id", organizationId);
   if (opts?.status) chain = chain.eq("status", opts.status);
   if (opts?.supplierId) chain = chain.eq("supplier_id", opts.supplierId);
-  return camelRows<PurchaseInvoice>(asRead(chain.order("created_at.desc")));
+  return camelRows<PurchaseInvoice>(
+    asRead(chain.order("created_at", { ascending: false }))
+  );
 }
 
 export async function getPurchaseInvoice(
@@ -97,9 +99,9 @@ export async function listPurchaseInvoiceItems(
 export async function createPurchaseInvoice(
   organizationId: EntityId,
   propertyId: EntityId,
+  outletId: EntityId,
   supplierId: EntityId,
   opts?: {
-    outletId?: EntityId;
     purchaseOrderId?: EntityId;
     invoiceDate?: string;
     dueDate?: string;
@@ -109,8 +111,8 @@ export async function createPurchaseInvoice(
   return callDoorRow<PurchaseInvoice>("create_purchase_invoice", {
     p_organization: organizationId,
     p_property: propertyId,
+    p_outlet: outletId,
     p_supplier: supplierId,
-    p_outlet: opts?.outletId,
     p_purchase_order: opts?.purchaseOrderId,
     p_invoice_date: opts?.invoiceDate,
     p_due_date: opts?.dueDate,
@@ -162,7 +164,9 @@ export async function listSupplierPayments(
     .select(PAYMENT_COLUMNS)
     .eq("organization_id", organizationId);
   if (opts?.supplierId) chain = chain.eq("supplier_id", opts.supplierId);
-  return camelRows<SupplierPayment>(asRead(chain.order("payment_date.desc")));
+  return camelRows<SupplierPayment>(
+    asRead(chain.order("payment_date", { ascending: false }))
+  );
 }
 
 export async function getSupplierPayment(
@@ -192,12 +196,12 @@ export async function listPaymentAllocations(
 export async function recordSupplierPayment(
   organizationId: EntityId,
   propertyId: EntityId,
+  outletId: EntityId,
   supplierId: EntityId,
   input: {
     paymentDate: string;
     paymentMethod: PaymentMethod;
     amount: number;
-    outletId?: EntityId;
     referenceNumber?: string;
     notes?: string;
   }
@@ -205,11 +209,11 @@ export async function recordSupplierPayment(
   return callDoorRow<SupplierPayment>("record_supplier_payment", {
     p_organization: organizationId,
     p_property: propertyId,
+    p_outlet: outletId,
     p_supplier: supplierId,
     p_payment_date: input.paymentDate,
     p_payment_method: input.paymentMethod,
     p_amount: input.amount,
-    p_outlet: input.outletId,
     p_reference_number: input.referenceNumber,
     p_notes: input.notes,
   });
@@ -240,7 +244,9 @@ export async function listPurchaseReturns(
     .eq("organization_id", organizationId);
   if (opts?.status) chain = chain.eq("status", opts.status);
   if (opts?.supplierId) chain = chain.eq("supplier_id", opts.supplierId);
-  return camelRows<PurchaseReturn>(asRead(chain.order("created_at.desc")));
+  return camelRows<PurchaseReturn>(
+    asRead(chain.order("created_at", { ascending: false }))
+  );
 }
 
 export async function getPurchaseReturn(
@@ -270,10 +276,10 @@ export async function listPurchaseReturnItems(
 export async function createPurchaseReturn(
   organizationId: EntityId,
   propertyId: EntityId,
+  outletId: EntityId,
   supplierId: EntityId,
   goodsReceiptId: EntityId,
   opts?: {
-    outletId?: EntityId;
     returnDate?: string;
     notes?: string;
   }
@@ -281,9 +287,9 @@ export async function createPurchaseReturn(
   return callDoorRow<PurchaseReturn>("create_purchase_return", {
     p_organization: organizationId,
     p_property: propertyId,
+    p_outlet: outletId,
     p_supplier: supplierId,
     p_goods_receipt: goodsReceiptId,
-    p_outlet: opts?.outletId,
     p_return_date: opts?.returnDate,
     p_notes: opts?.notes,
   });

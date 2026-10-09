@@ -183,8 +183,10 @@ export function orderCanSendKot(status: OrderStatus): boolean {
  * number and counts the lines by fire state) and it gates on `kot.view`.
  */
 export async function listOpenKots(outletId: EntityId): Promise<OpenKotSummary[]> {
-  const rows = await callDoor<unknown[]>("open_kots", { outlet: outletId });
-  return rows.map((row) => openKotFromWire(row as Record<string, unknown>));
+  const result = await callDoor<{ outletId: EntityId; kots: unknown[] }>("open_kots", {
+    outlet: outletId,
+  });
+  return result.kots.map((row) => openKotFromWire(row as Record<string, unknown>));
 }
 
 /** One slip whole, exactly as the printer was handed it. */

@@ -195,7 +195,7 @@ export default function ShiftPage() {
           ) : (
             <Card
               title="Open shift"
-              description={`Opened ${new Date(shift.openedAt).toLocaleString()} · ${formatMoneyText(shift.openingCash, "INR")}`}
+              description={`Opened ${new Date(shift.openedAt).toLocaleString()} · ${formatMoneyText(String(shift.openingCash), "INR")}`}
             >
               {canManage ? (
                 <div className="flex flex-col gap-3">

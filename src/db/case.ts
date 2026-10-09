@@ -58,7 +58,11 @@ export function toDoorArgs(input: Record<string, unknown>): Record<string, unkno
   const args: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(input)) {
     if (value === undefined) continue;
-    args[`p_${key.replace(CAMEL_BOUNDARY, "$1_$2").toLowerCase()}`] = value;
+    // Several later service generations pass keys already named `p_organization`;
+    // stripping a leading `p_` here keeps both conventions on one wire shape instead
+    // of sending `p_p_organization`, which PostgREST answers with "not found".
+    const bare = key.startsWith("p_") ? key.slice(2) : key;
+    args[`p_${bare.replace(CAMEL_BOUNDARY, "$1_$2").toLowerCase()}`] = value;
   }
   return args;
 }

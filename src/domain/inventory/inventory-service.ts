@@ -32,8 +32,8 @@ const CATEGORY_COLUMNS =
   "id, organization_id, name, code, description, display_order, status, created_at, updated_at";
 
 const ITEM_COLUMNS =
-  "id, organization_id, name, code, category_id, item_type, base_unit_id, track_batch, " +
-  "track_expiry, reorder_level, reorder_quantity, attributes, status, created_at, updated_at";
+  "id, organization_id, name, code, category_id, description, item_type, base_unit_id, " +
+  "track_batch, track_expiry, reorder_level, reorder_quantity, attributes, status, created_at, updated_at";
 
 const LOCATION_COLUMNS =
   "id, organization_id, property_id, outlet_id, name, code, location_type, description, " +
@@ -205,6 +205,7 @@ export async function createItem(
   item: {
     name: string;
     code: string;
+    description?: string;
     category_id?: EntityId;
     item_type: string;
     base_unit_id: EntityId;
@@ -212,58 +213,64 @@ export async function createItem(
     track_expiry?: boolean;
     reorder_level?: number;
     reorder_quantity?: number;
-    attributes?: Record<string, unknown>;
   }
 ): Promise<InventoryItem> {
   return callDoorRow<InventoryItem>("create_inventory_item", {
     p_organization: organizationId,
     p_name: item.name,
     p_code: item.code,
-    p_category_id: item.category_id,
     p_item_type: item.item_type,
-    p_base_unit: item.base_unit_id,
+    p_base_unit_id: item.base_unit_id,
+    p_category_id: item.category_id,
+    p_description: item.description,
     p_track_batch: item.track_batch ?? false,
     p_track_expiry: item.track_expiry ?? false,
     p_reorder_level: item.reorder_level,
     p_reorder_quantity: item.reorder_quantity,
-    p_attributes: item.attributes ? JSON.stringify(item.attributes) : null,
   });
 }
 
 export async function updateItem(
   itemId: EntityId,
-  organizationId: EntityId,
-  updates: Partial<Omit<InventoryItem, "id" | "organizationId" | "createdAt" | "updatedAt">>,
+  updates: {
+    name?: string;
+    code?: string;
+    description?: string;
+    categoryId?: EntityId;
+    itemType?: string;
+    baseUnitId?: EntityId;
+    trackBatch?: boolean;
+    trackExpiry?: boolean;
+    reorderLevel?: number;
+    reorderQuantity?: number;
+  },
   expectedVersion: number
 ): Promise<InventoryItem> {
   return callDoorRow<InventoryItem>("update_inventory_item", {
     p_item: itemId,
-    p_organization: organizationId,
     p_name: updates.name,
     p_code: updates.code,
     p_category_id: updates.categoryId,
+    p_description: updates.description,
     p_item_type: updates.itemType,
-    p_base_unit: updates.baseUnitId,
+    p_base_unit_id: updates.baseUnitId,
     p_track_batch: updates.trackBatch,
     p_track_expiry: updates.trackExpiry,
     p_reorder_level: updates.reorderLevel,
     p_reorder_quantity: updates.reorderQuantity,
-    p_attributes: updates.attributes ? JSON.stringify(updates.attributes) : null,
     p_expected_version: expectedVersion,
   });
 }
 
 export async function setItemStatus(
   itemId: EntityId,
-  organizationId: EntityId,
   status: string,
-  expectedVersion: number
-): Promise<void> {
-  await callDoor("set_inventory_item_status", {
+  reason: string
+): Promise<InventoryItem> {
+  return callDoorRow<InventoryItem>("set_inventory_item_status", {
     p_item: itemId,
-    p_organization: organizationId,
     p_status: status,
-    p_expected_version: expectedVersion,
+    p_reason: reason,
   });
 }
 
@@ -300,7 +307,7 @@ export async function createLocation(
   return callDoorRow<InventoryLocation>("create_inventory_location", {
     p_organization: organizationId,
     p_property: propertyId,
-    p_outlet: outletId,
+    p_outlet_id: outletId,
     p_name: name,
     p_code: code,
     p_location_type: locationType,

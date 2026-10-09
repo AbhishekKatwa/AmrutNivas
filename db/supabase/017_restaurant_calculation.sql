@@ -98,7 +98,11 @@ begin
   end loop;
 
   -- Discount: read from order-level field if present (future: discount table)
-  v_discount := coalesce((v_order->>'discount_amount')::numeric, 0);
+  -- Clamped to the ACTIVE subtotal: a discount is a reduction OF what is on the ticket, never
+  -- a credit. apply_order_discount caps a FIXED discount at apply time, but lines can void away
+  -- afterwards; without this clamp a discount larger than what remains drives grand_total
+  -- negative and orders_money_ok rejects the recalc write, killing the void itself.
+  v_discount := least(coalesce((v_order->>'discount_amount')::numeric, 0), v_subtotal);
 
   -- Tax: each line's own rate applied to its own base. Nothing writes tax_rate today — there
   -- is no rate table anywhere in this schema, and 014 left menu_items.tax_category_id as an

@@ -59,10 +59,26 @@ export interface InventoryCategory {
 // ============================================================ inventory items
 
 export type ItemStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
-export type ItemType = "STOCK" | "NON_STOCK" | "SERVICE";
+// Mirrors the inventory_items_type_ok check in 023 — the database is the arbiter.
+export type ItemType =
+  | "RAW_MATERIAL"
+  | "INGREDIENT"
+  | "BEVERAGE"
+  | "PACKAGING"
+  | "CONSUMABLE"
+  | "CLEANING"
+  | "OTHER";
 
 export const ITEM_STATUSES: readonly ItemStatus[] = ["ACTIVE", "INACTIVE", "ARCHIVED"];
-export const ITEM_TYPES: readonly ItemType[] = ["STOCK", "NON_STOCK", "SERVICE"];
+export const ITEM_TYPES: readonly ItemType[] = [
+  "RAW_MATERIAL",
+  "INGREDIENT",
+  "BEVERAGE",
+  "PACKAGING",
+  "CONSUMABLE",
+  "CLEANING",
+  "OTHER",
+];
 
 export interface InventoryItem {
   id: EntityId;
@@ -70,6 +86,7 @@ export interface InventoryItem {
   name: string;
   code: string;
   categoryId?: EntityId;
+  description?: string;
   itemType: ItemType;
   baseUnitId: EntityId;
   trackBatch: boolean;

@@ -698,8 +698,7 @@ begin
     jsonb_typeof(p_splits) = 'array' and jsonb_array_length(p_splits) >= 2,
     'NIVAAS_INVALID');
 
-  -- Cancel the original bill.
-  perform app.require_bill_transition((v_bill->>'status'), 'CANCELLED');
+  -- Cancel the original bill. Status is already pinned OPEN + unpaid by the guard above.
   update public.bills
      set status = 'CANCELLED', cancelled_at = now(), cancelled_by = v_actor,
          cancel_reason = 'Split into multiple bills', version = version + 1
@@ -875,7 +874,7 @@ begin
   perform app.require_writable_outlet(v_out);
 
   -- Resolve business date.
-  v_bdate := coalesce(p_business_date, app.resolve_business_date(v_out));
+  v_bdate := coalesce(p_business_date, app.rest_outlet_business_date(v_out));
 
   -- Cannot open a second shift while one is already OPEN.
   perform app.require_valid(
@@ -884,8 +883,8 @@ begin
     'NIVAAS_CONFLICT');
 
   insert into public.restaurant_shifts
-    (organization_id, property_id, outlet_id, business_date, operator_id, opening_cash, created_by)
-  values (v_org, v_prop, v_out, v_bdate, v_actor, coalesce(p_opening_cash, 0), v_actor)
+    (organization_id, property_id, outlet_id, business_date, operator_id, opening_cash)
+  values (v_org, v_prop, v_out, v_bdate, v_actor, coalesce(p_opening_cash, 0))
   -- Bare table name in RETURNING whole-row capture (see create_kitchen_station note).
   returning to_jsonb(restaurant_shifts) into v_row;
 

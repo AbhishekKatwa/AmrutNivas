@@ -118,13 +118,16 @@ export function billAcceptsPayment(status: BillStatus): boolean {
 }
 
 /**
- * Nothing left due. Read as an integer, never as a float: `amount_due` is TEXT precisely so a
- * comparison like this one cannot be the place where ₹0.01 turns into `1e-18` and a settled
- * bill looks unpaid (contract §1).
+ * Nothing left due AND not yet handed over: `close_bill` stamps `paid_at` and keeps the status
+ * PAID, so without the paid_at guard the Close bill button rendered forever on a closed
+ * document, each click re-stamping the door and writing another audit row. Read as an integer,
+ * never as a float: `amount_due` is TEXT precisely so a comparison like this one cannot be the
+ * place where ₹0.01 turns into `1e-18` and a settled bill looks unpaid (contract §1).
  */
 export function billIsSettled(bill: Bill): boolean {
   return (
-    bill.status === "PAID" || moneyFromRupees(bill.amountDue, bill.currency).minor === 0n
+    bill.paidAt === null &&
+    (bill.status === "PAID" || moneyFromRupees(bill.amountDue, bill.currency).minor === 0n)
   );
 }
 

@@ -187,23 +187,25 @@ export function FoundationStatusPage() {
         <div className="px-4 py-4 sm:px-5">
           <EmptyState
             icon={<CircleSlash aria-hidden />}
-            title="No data plane connected to this build"
-            description="The doors and reads below work against a real Postgres, but this preview ships
-              without project keys, so there is nothing to report. Rather than show zeros, the
-              figures a live installation would carry — properties, outlets, staff, reservations,
-              orders, stock and ledger balances — are recorded here as unavailable."
+            title="Operational totals live on each module's overview"
+            description="The data plane is wired — every read and write goes through hosted Supabase
+              with RLS + SECURITY DEFINER doors. This page proves the foundation modules (brand,
+              money, navigation); the tenant's own operational totals — properties, outlets,
+              staff, reservations, orders, stock — render on each module's overview screen, not
+              here. Rather than show zeros, this surface stays out of the way."
           />
         </div>
       </Card>
 
       <Card>
-        <p className="text-sm font-semibold text-ink">Next: Prompt #03 — real authentication, RBAC and audit hardening</p>
+        <p className="text-sm font-semibold text-ink">Wire status</p>
         <p className="mt-1 text-xs leading-relaxed text-muted">
-          The registry shows {summary.phaseZeroPending} Phase 0 destinations still to be built.
-          Prompt #02 delivered the tenant: hierarchy and people CRUD through server-side doors, the
-          active-context switcher, tenant cache isolation and the audit trail. What remains before a
-          customer signs in is GoTrue (this stage runs as a seeded dev user), invitation email, and
-          applying these migrations to a hosted project.
+          Authentication (#31.5 — User ID + password through <code className="rounded-sm bg-surface-sunken px-1 py-0.5">resolve_login</code>),
+          the RBAC ladder, the audit trail, migrations 000–049 and the hosted Supabase data plane
+          are all live. The registry still lists {summary.phaseZeroPending} Phase 0 destinations
+          as road-map items; the navigation switcher hides them by default. The deployment
+          configuration surface (SMTP, site URL, redirect allow-list) is the remaining server
+          item tracked under task #58.
         </p>
       </Card>
     </div>

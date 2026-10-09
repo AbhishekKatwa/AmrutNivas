@@ -8,6 +8,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { LoadingBlock } from "@/components/ui/Spinner";
+import { Switch } from "@/components/ui/Switch";
 import { SelectInput, type SelectOption } from "@/components/ui/SelectInput";
 import { TextInput } from "@/components/ui/TextInput";
 import {
@@ -19,30 +20,42 @@ import {
 import type {
   InventoryCategory,
   InventoryItem,
+  ItemType,
   UnitOfMeasure,
 } from "@/domain/inventory/types";
+import { ITEM_TYPES } from "@/domain/inventory/types";
 import { useContextStore } from "@/state/context-store";
 
 type ItemFormState = {
   name: string;
   code: string;
-  item_type: "STOCK" | "NON_STOCK" | "SERVICE";
+  item_type: ItemType;
   base_unit_id: string;
   category_id: string;
+  track_batch: boolean;
+  track_expiry: boolean;
+  reorder_level: string;
+  reorder_quantity: string;
 };
 
-const ITEM_TYPE_OPTIONS: SelectOption<string>[] = [
-  { value: "STOCK", label: "Stock" },
-  { value: "NON_STOCK", label: "Non-Stock" },
-  { value: "SERVICE", label: "Service" },
-];
+const ITEM_TYPE_OPTIONS: SelectOption<ItemType>[] = ITEM_TYPES.map((t) => ({
+  value: t,
+  label: t
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" "),
+}));
 
 const EMPTY_FORM: ItemFormState = {
   name: "",
   code: "",
-  item_type: "STOCK",
+  item_type: "RAW_MATERIAL",
   base_unit_id: "",
   category_id: "",
+  track_batch: false,
+  track_expiry: false,
+  reorder_level: "",
+  reorder_quantity: "",
 };
 
 const COLUMNS: DataColumn<InventoryItem>[] = [
@@ -130,6 +143,10 @@ export default function ItemsPage() {
         item_type: form.item_type,
         base_unit_id: form.base_unit_id,
         category_id: form.category_id || undefined,
+        track_batch: form.track_batch,
+        track_expiry: form.track_expiry,
+        reorder_level: form.reorder_level ? parseFloat(form.reorder_level) : undefined,
+        reorder_quantity: form.reorder_quantity ? parseFloat(form.reorder_quantity) : undefined,
       });
       setDialogOpen(false);
       setForm(EMPTY_FORM);
@@ -255,6 +272,46 @@ export default function ItemsPage() {
               onChange={(value) => setForm({ ...form, category_id: value })}
             />
           </Field>
+          <div className="rounded-md border border-line bg-surface-sunken/40 p-3">
+            <Switch
+              checked={form.track_batch}
+              onChange={(checked) => setForm({ ...form, track_batch: checked })}
+              label="Track batch numbers"
+              description="Enable batch/lot tracking on receipts and stock movements."
+            />
+          </div>
+          <div className="rounded-md border border-line bg-surface-sunken/40 p-3">
+            <Switch
+              checked={form.track_expiry}
+              onChange={(checked) => setForm({ ...form, track_expiry: checked })}
+              label="Track expiry dates"
+              description="Capture expiry on receipts and surface aging reports."
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Reorder Level" hint="Alert when stock falls below this quantity.">
+              <TextInput
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                value={form.reorder_level}
+                onChange={(e) => setForm({ ...form, reorder_level: e.target.value })}
+                placeholder="e.g. 5"
+              />
+            </Field>
+            <Field label="Reorder Quantity" hint="Suggested replenishment quantity.">
+              <TextInput
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                value={form.reorder_quantity}
+                onChange={(e) => setForm({ ...form, reorder_quantity: e.target.value })}
+                placeholder="e.g. 25"
+              />
+            </Field>
+          </div>
         </div>
       </Dialog>
     </div>

@@ -25,24 +25,26 @@ export const SUPPLIER_STATUSES: readonly SupplierStatus[] = [
 
 export type SupplierType =
   | "RAW_MATERIAL"
+  | "FOOD"
+  | "BEVERAGE"
   | "PACKAGING"
+  | "CLEANING"
   | "EQUIPMENT"
   | "MAINTENANCE"
-  | "SERVICES"
-  | "UTILITIES"
-  | "TRANSPORT"
-  | "LABOR"
+  | "UTILITY"
+  | "SERVICE"
   | "OTHER";
 
 export const SUPPLIER_TYPES: readonly SupplierType[] = [
   "RAW_MATERIAL",
+  "FOOD",
+  "BEVERAGE",
   "PACKAGING",
+  "CLEANING",
   "EQUIPMENT",
   "MAINTENANCE",
-  "SERVICES",
-  "UTILITIES",
-  "TRANSPORT",
-  "LABOR",
+  "UTILITY",
+  "SERVICE",
   "OTHER",
 ];
 
@@ -51,15 +53,20 @@ export interface Supplier {
   organizationId: EntityId;
   supplierCode: string;
   legalName: string;
-  tradeName?: string;
+  displayName?: string;
   supplierType: SupplierType;
   status: SupplierStatus;
-  taxId?: string;
-  taxType?: string;
-  openingBalance?: number;
-  paymentTerms?: number;
+  taxIdentifier?: string;
+  gstin?: string;
+  pan?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  paymentTermsDays?: number;
   creditLimit?: number;
+  currency?: string;
   notes?: string;
+  openingBalance?: number;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -67,59 +74,83 @@ export interface Supplier {
 
 export interface SupplierContact {
   id: EntityId;
-  organizationId: EntityId;
   supplierId: EntityId;
-  contactName: string;
+  name: string;
   designation?: string;
   phone?: string;
   email?: string;
   isPrimary: boolean;
+  notes?: string;
   createdAt: string;
+  updatedAt: string;
 }
+
+export type SupplierAddressType =
+  | "REGISTERED"
+  | "BILLING"
+  | "SHIPPING"
+  | "WAREHOUSE"
+  | "OTHER";
+
+export const SUPPLIER_ADDRESS_TYPES: readonly SupplierAddressType[] = [
+  "REGISTERED",
+  "BILLING",
+  "SHIPPING",
+  "WAREHOUSE",
+  "OTHER",
+];
 
 export interface SupplierAddress {
   id: EntityId;
-  organizationId: EntityId;
   supplierId: EntityId;
-  addressType: "BILLING" | "SHIPPING" | "OFFICE";
+  addressType: SupplierAddressType;
   addressLine1: string;
   addressLine2?: string;
   city?: string;
   state?: string;
   postalCode?: string;
   country: string;
-  isDefault: boolean;
+  isPrimary: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface SupplierItem {
   id: EntityId;
-  organizationId: EntityId;
   supplierId: EntityId;
-  itemId: EntityId;
-  purchaseUnitId: EntityId;
+  inventoryItemId: EntityId;
+  supplierItemCode?: string;
+  supplierItemName?: string;
+  purchaseUnit: EntityId;
   conversionToBase: number;
   lastPurchaseRate?: number;
   standardRate?: number;
+  minimumOrderQty?: number;
   leadTimeDays?: number;
-  minimumOrderQuantity?: number;
   isPreferred: boolean;
+  isActive: boolean;
+  notes?: string;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface SupplierPriceHistory {
   id: EntityId;
-  organizationId: EntityId;
   supplierId: EntityId;
-  itemId: EntityId;
+  inventoryItemId: EntityId;
   purchaseOrderId?: EntityId;
+  goodsReceiptId?: EntityId;
   purchaseDate: string;
-  unitRate: number;
-  discountPercent?: number;
-  taxRate?: number;
-  freightAmount?: number;
+  quantity: number;
+  purchaseUnit: EntityId;
+  rate: number;
+  discount: number;
+  taxAmount: number;
+  freightAmount: number;
+  otherCharges: number;
   landedRate?: number;
+  currency: string;
   createdAt: string;
 }
 
@@ -128,18 +159,29 @@ export interface SupplierPriceHistory {
 export type PurchaseRequestStatus =
   | "DRAFT"
   | "SUBMITTED"
+  | "UNDER_REVIEW"
   | "APPROVED"
   | "REJECTED"
-  | "CONVERTED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "CONVERTED_TO_PO";
 
 export const PURCHASE_REQUEST_STATUSES: readonly PurchaseRequestStatus[] = [
   "DRAFT",
   "SUBMITTED",
+  "UNDER_REVIEW",
   "APPROVED",
   "REJECTED",
-  "CONVERTED",
   "CANCELLED",
+  "CONVERTED_TO_PO",
+];
+
+export type PurchaseRequestPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+export const PURCHASE_REQUEST_PRIORITIES: readonly PurchaseRequestPriority[] = [
+  "LOW",
+  "NORMAL",
+  "HIGH",
+  "URGENT",
 ];
 
 export interface PurchaseRequest {
@@ -147,14 +189,13 @@ export interface PurchaseRequest {
   organizationId: EntityId;
   propertyId: EntityId;
   outletId?: EntityId;
-  requestNumber: string;
-  requestedAt: string;
   requestedBy: EntityId;
+  requestDate: string;
+  requiredByDate?: string;
+  reason?: string;
+  priority: PurchaseRequestPriority;
   status: PurchaseRequestStatus;
   notes?: string;
-  approvedAt?: string;
-  approvedBy?: EntityId;
-  rejectionReason?: string;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -162,13 +203,10 @@ export interface PurchaseRequest {
 
 export interface PurchaseRequestItem {
   id: EntityId;
-  organizationId: EntityId;
-  requestId: EntityId;
-  itemId: EntityId;
-  quantity: number;
-  unitId: EntityId;
-  estimatedRate?: number;
-  preferredSupplierId?: EntityId;
+  purchaseRequestId: EntityId;
+  inventoryItemId: EntityId;
+  requestedQuantity: number;
+  uom: EntityId;
   notes?: string;
   createdAt: string;
 }
@@ -201,20 +239,22 @@ export interface PurchaseOrder {
   organizationId: EntityId;
   propertyId: EntityId;
   outletId?: EntityId;
-  purchaseRequestId?: EntityId;
   supplierId: EntityId;
   poNumber: string;
   orderDate: string;
   expectedDelivery?: string;
+  currency: string;
+  paymentTermsDays?: number;
   status: PurchaseOrderStatus;
   subtotal: number;
-  discountAmount: number;
-  taxAmount: number;
-  freightAmount: number;
-  otherCharges: number;
+  totalDiscount: number;
+  totalTax: number;
+  totalFreight: number;
+  totalOtherCharges: number;
   grandTotal: number;
   totalReceived: number;
   notes?: string;
+  createdBy: EntityId;
   approvedAt?: string;
   approvedBy?: EntityId;
   sentAt?: string;
@@ -228,17 +268,18 @@ export interface PurchaseOrder {
 
 export interface PurchaseOrderItem {
   id: EntityId;
-  organizationId: EntityId;
   purchaseOrderId: EntityId;
-  itemId: EntityId;
-  description: string;
+  inventoryItemId: EntityId;
+  description?: string;
   orderedQuantity: number;
   receivedQuantity: number;
-  unitId: EntityId;
+  uom: EntityId;
   unitRate: number;
-  discountAmount: number;
-  taxRate: number;
-  taxAmount: number;
+  discount?: number;
+  taxRate?: number;
+  lineSubtotal: number;
+  lineDiscount: number;
+  lineTax: number;
   lineTotal: number;
   notes?: string;
   createdAt: string;
@@ -249,10 +290,8 @@ export type ChargeType =
   | "TRANSPORT"
   | "LOADING"
   | "UNLOADING"
-  | "STORAGE"
+  | "HANDLING"
   | "INSURANCE"
-  | "CUSTOMS"
-  | "TAX"
   | "OTHER";
 
 export const CHARGE_TYPES: readonly ChargeType[] = [
@@ -260,33 +299,50 @@ export const CHARGE_TYPES: readonly ChargeType[] = [
   "TRANSPORT",
   "LOADING",
   "UNLOADING",
-  "STORAGE",
+  "HANDLING",
   "INSURANCE",
-  "CUSTOMS",
-  "TAX",
   "OTHER",
 ];
 
-export type PayableToType = "SUPPLIER" | "TRANSPORTER" | "AGENT" | "OTHER";
+export type PayableToType =
+  | "SUPPLIER"
+  | "TRANSPORTER"
+  | "OTHER_VENDOR"
+  | "EMPLOYEE"
+  | "CASH"
+  | "OTHER";
 
 export const PAYABLE_TO_TYPES: readonly PayableToType[] = [
   "SUPPLIER",
   "TRANSPORTER",
-  "AGENT",
+  "OTHER_VENDOR",
+  "EMPLOYEE",
+  "CASH",
   "OTHER",
 ];
 
+export type ChargeAllocationMethod =
+  | "BY_VALUE"
+  | "BY_QUANTITY"
+  | "BY_WEIGHT"
+  | "BY_VOLUME"
+  | "EQUAL"
+  | "MANUAL";
+
 export interface PurchaseCharge {
   id: EntityId;
-  organizationId: EntityId;
   purchaseOrderId: EntityId;
   chargeType: ChargeType;
-  description: string;
+  description?: string;
   amount: number;
+  taxAmount: number;
+  currency: string;
   payableToType: PayableToType;
-  payableToId?: EntityId;
+  payableToSupplierId?: EntityId;
+  expenseCategory?: string;
   capitalizeToInventory: boolean;
-  allocationMethod: "AMOUNT" | "QUANTITY" | "VALUE";
+  allocationMethod?: ChargeAllocationMethod;
+  notes?: string;
   createdAt: string;
 }
 
@@ -323,22 +379,21 @@ export interface GoodsReceipt {
 
 export interface GoodsReceiptItem {
   id: EntityId;
-  organizationId: EntityId;
-  receiptId: EntityId;
-  purchaseOrderItemId: EntityId;
-  itemId: EntityId;
-  orderedQuantity: number;
+  goodsReceiptId: EntityId;
+  purchaseOrderItemId?: EntityId;
+  inventoryItemId: EntityId;
+  orderedQuantity?: number;
   receivedQuantity: number;
-  acceptedQuantity: number;
-  rejectedQuantity: number;
-  unitId: EntityId;
-  unitCost: number;
-  totalCost: number;
+  acceptedQuantity?: number;
+  rejectedQuantity?: number;
+  uom: EntityId;
+  unitRate: number;
   batchNumber?: string;
   expiryDate?: string;
+  manufacturingDate?: string;
   rejectionReason?: string;
+  notes?: string;
   ledgerId?: EntityId;
-  locationId: EntityId;
   createdAt: string;
 }
 

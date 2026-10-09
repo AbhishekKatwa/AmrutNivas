@@ -769,8 +769,10 @@ export default function TeamPage() {
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
               <p className="text-xs leading-relaxed text-ink">
                 This token is shown <span className="font-semibold">once</span>. The database keeps only its
-                hash, so it cannot be retrieved after you close this panel. Send the link now — the live
-                email delivery arrives with Prompt #03.
+                hash, so it cannot be retrieved after you close this panel. Copy the link now and
+                send it to the invitee through your usual channel. When SMTP is configured for the
+                deployment, the platform delivers the invite automatically; until then this panel
+                hands it over.
               </p>
             </div>
             <Field label="Accept link" hint="Copy and send this to the invited address.">

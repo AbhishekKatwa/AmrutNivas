@@ -70,6 +70,10 @@ export const DOOR_ERRORS: Record<string, DoorErrorSpec> = {
     "PERMISSION_DENIED",
     "You cannot grant or create a role that reaches above your own authority.",
   ),
+  // 023 inventory doors raise NIVAAS_FORBIDDEN when the caller's effective permissions
+  // do not include the action key (e.g. location.create). Same code as ACCESS_DENIED,
+  // same DENIED copy — the user should not see a different sentence for the same cause.
+  NIVAAS_FORBIDDEN: spec("PERMISSION_DENIED", DENIED),
 
   // ---- tenancy integrity (a client should never see these; they mean a bug)
   NIVAAS_SCOPE_MISMATCH: spec(

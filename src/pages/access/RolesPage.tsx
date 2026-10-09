@@ -1558,6 +1558,16 @@ export function buildRoleColumns(handlers: {
       ),
     },
     {
+      key: "status",
+      header: "Status",
+      render: (role) =>
+        role.status === "ACTIVE" ? (
+          <Badge tone="success">Active</Badge>
+        ) : (
+          <Badge tone="warning">Retired</Badge>
+        ),
+    },
+    {
       key: "permissions",
       header: "Permissions",
       render: (role) => {

@@ -641,11 +641,15 @@ export default function BillPage() {
                 {orderBill !== null ? (
                   <p className="text-sm leading-relaxed text-muted">
                     This ticket is already billed as {orderBill.billNumber}, which is{" "}
-                    {orderBill.status === "PAID"
-                      ? "settled"
-                      : `outstanding by ${formatMoneyText(orderBill.amountDue, orderBill.currency)}`}
-                    . Open that document from the rail instead of opening a second one — the
-                    door would refuse it.
+                    {orderBill.paidAt !== null
+                      ? "settled and closed"
+                      : orderBill.status === "PAID"
+                        ? "settled"
+                        : `outstanding by ${formatMoneyText(orderBill.amountDue, orderBill.currency)}`}
+                    .{" "}
+                    {orderBill.paidAt !== null
+                      ? "A closed bill leaves the rail, and the door would refuse a second document for this ticket."
+                      : "Open that document from the rail instead of opening a second one — the door would refuse it."}
                   </p>
                 ) : (
                   <ul className="flex flex-col gap-2">
